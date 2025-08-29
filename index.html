@@ -14,7 +14,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.1 - 29-08-2025 @ 19:43";
+    const nextversion = "ClariQ Next 0.0.2 - 29-08-2025 @ 22:20";
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
       "X8500H", "R-A110", "-S730H", "-S740H", "-S750H", "-S760H", "-S930H", "-S940H", "-S950H", "-S960H", "X1400H", "X1500H", "X1600H",
       "X1700H", "X2400H", "X2500H", "X2600H", "X2700H", "X3400H", "X3500H", "X3600H", "X3700H", "X4300H", "X4400H", "X4500H", "X4700H",
@@ -151,6 +151,12 @@
                 <li>75dB home cinema / livingroom (small room acoustics)</li>
                 <li>85dB dedicated cinema / room (large room acoustics)</li>
                 <li>Cedia RP22 mode!</li>
+                <ul>
+                  <li>changes applied smoothing</li>
+                  <li>changes frequency ranges</li>
+                  <li>changes Crossover selection ranges</li>
+                  <li>aiming for full CEDIA RP22 coverage</li>
+                </ul>
               </ul>
             </ul>
             <ul>
@@ -697,13 +703,80 @@
         } catch (error) {
           console.error('Error generating or downloading zip file:', error);
         }
+        let lastValidationState = null; // Track previous validation state
+        let isFirstValidation = true; // Track if this is the first validation run
+
         const checkMeasurementCount = async () => {
           const measurements = await fetch_mREW();
           let mCount = Object.keys(measurements).length;
           if (isCirrusLogic) (mCount--);
+
+          // Always validate measurement names against ADY file (regardless of count)
+          try {
+            const expectedMeasurements = new Set();
+
+            // Extract expected measurement names from ADY
+            jsonData.detectedChannels.forEach(channel => {
+              const commandId = channel.commandId;  // e.g., "FL"
+              const indices = Object.keys(channel.responseData); // e.g., ["0", "1", "2"]
+
+              // Generate expected REW names: FL0, FL1, FL2
+              indices.forEach(index => {
+                expectedMeasurements.add(`${commandId}${index}`);
+              });
+            });
+
+            // Get actual REW measurement names
+            const actualMeasurements = new Set();
+            for (let i = 1; i <= mCount; i++) {
+              actualMeasurements.add(measurements[i].title);
+            }
+
+            // Find discrepancies
+            const missing = [...expectedMeasurements].filter(name => !actualMeasurements.has(name));
+            const extra = [...actualMeasurements].filter(name => !expectedMeasurements.has(name));
+
+            // Create current validation state for comparison
+            const currentValidationState = JSON.stringify({ missing, extra, mCount });
+
+            // Show validation messages on first run OR if state changed
+            if (isFirstValidation || currentValidationState !== lastValidationState) {
+              console.infoUpdate("Validating REW measurements against ADY file...");
+
+              // Report findings
+              if (missing.length === 0 && extra.length === 0) {
+                console.infoUpdate("✓ All REW measurements match ADY file expectations");
+              } else {
+                if (missing.length > 0) {
+                  console.warn(`⚠ Missing measurements (expected in ADY but not in REW): ${missing.join(', ')}`);
+                }
+                if (extra.length > 0) {
+                  console.warn(`⚠ Extra measurements (in REW but not expected by ADY): ${extra.join(', ')}`);
+                }
+                console.warn("You can add/remove measurements in REW before continuing");
+              }
+
+              lastValidationState = currentValidationState;
+              isFirstValidation = false;
+            }
+
+          } catch (error) {
+            console.warn("Could not validate measurement names against ADY file:", error.message);
+          }
+
+          // Check if count matches for success logic
           if (mCount === totalMeasurements) {
+            // Enhanced success logging with measurement names
+            const importedMeasurements = [];
+            for (let i = 1; i <= mCount; i++) {
+              importedMeasurements.push(measurements[i].title);
+            }
+
+            // Original success logic
             // document.getElementById("button2").disabled = false;
             console.infoUpdate(`All ${isCirrusLogic ? mCount + 1 : mCount} measurements have now been successfully imported!`);
+            console.infoUpdate(`Successfully imported measurements: ${importedMeasurements.join(', ')}`);
+
             // communicate with script.js
             window.measurementsImported = true;
             window.updateContinueButtonState();
@@ -1226,12 +1299,6 @@
     }
 
     async function bootUp() {
-      /*
-      console.info("Resetting IR windows, equalizer & target settings for all measurements");
-      const measurements = await fetch_mREW();
-      const titles = {}; let titleIndices = {};
-      let mCount = Object.keys(measurements).length;
-      */
       console.info("Resetting IR windows, equalizer & target settings for all measurements");
       const measurements = await fetch_mREW();
       const titles = {}; let titleIndices = {};
@@ -1768,8 +1835,13 @@
       for (let i = 1; i <= nChannels; i++) {
         console.info(`${commandId[i].padStart(3, ".")} - equalizing channel...`);
         const isSub = commandId[i].startsWith("SW");
+
+        // line up speaker response to target similar to REW, but don't affect subwoofer
+        const tcLevelOffset = isSub ? 0 : await getTrim(i, 200, 2000);
+        await fetchSafe('target-level', i, targetLevel - tcLevelOffset);
+
         // await fetchSafe('target-level', i, 75.0);
-        await fetchSafe('target-level', i, targetLevel)
+        // await fetchSafe('target-level', i, targetLevel)
         await postNext('Smooth', i, { smoothing: "Var" });
         await postSafe(`${baseUrl}/${i}/target-settings`, {
           shape: isSub ? "Subwoofer" : "Full range",
@@ -1829,22 +1901,22 @@
         const eqResponseIdx = Object.keys(eqResponse.results)[0];
         const eqResponseName = `${commandId[i]}-equalized`;
         await fetch_mREW(eqResponseIdx, 'PUT', { title: eqResponseName });
-        // compensate equalized response & trims for auto level
+        // compensate equalized response & trims for auto level as well as tc level offset
         let logUpdate = `${commandId[i].padStart(3, ".")} - equalized`;
-        const ALTrimOffset = Math.round(ALOffset * 2) / 2; //round to nearest 0.5
-        if (ALTrimOffset != 0) {
-          await postNext('Add SPL offset', i, { offset: ALTrimOffset }); // offset "o" for auto-level
-          await postNext('Add SPL offset', eqResponseIdx, { offset: ALTrimOffset }); // offset "-equalized" for auto-level
+        const trimOffset = tcLevelOffset + Math.round(ALOffset * 2) / 2; //round to nearest 0.5
+        if (trimOffset != 0) {
+          await postNext('Add SPL offset', i, { offset: trimOffset }); // offset "o"
+          await postNext('Add SPL offset', eqResponseIdx, { offset: trimOffset }); // offset "-equalized"
           const customLevelOriginal = customLevel[i];
           if (isSub) {
             for (let j = nSpeakers + 1; j <= nSpeakers + nSubs; j++) {
-              customLevel[j] += ALTrimOffset;
+              customLevel[j] += trimOffset;
             }
           }
           else {
-            customLevel[i] += ALTrimOffset;
+            customLevel[i] += trimOffset;
           }
-          logUpdate += ` | auto-level offset: ${customLevelOriginal}dB → ${customLevel[i]}dB (${ALTrimOffset}dB)`;
+          logUpdate += ` | auto-level offset: ${customLevelOriginal}dB → ${customLevel[i]}dB (${trimOffset}dB)`;
         }
         console.infoUpdate(logUpdate);
       }
@@ -1927,7 +1999,15 @@
     }
 
     async function getLow3dBPoint(idx, start = 10, end = 320) {
-      const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+      // const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+      let response;
+      if (isRP22mode == true) {
+        response = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
+        console.info("getLow3dBPoint: applying CEDIA RP22 - 1/3 smoothing");
+      } else {
+        response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+        console.info("getLow3dBPoint: applying Default - Psy smoothing");
+      }
       const rpArray = response2array(response, start, end);
       const tcArray = response2array(targetResponse, start, end);
       const arrLength = Math.min(rpArray.length, tcArray.length);
@@ -1942,7 +2022,15 @@
     }
 
     async function getHigh3dBPoint(idx, start = 10, end = 320) {
-      const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+      // const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+      let response;
+      if (isRP22mode == true) {
+        response = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
+        console.info("getHigh3dBPoint: applying CEDIA RP22 - 1/3 smoothing");
+      } else {
+        response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+        console.info("getHigh3dBPoint: applying Default - Psy smoothing");
+      }
       const rpArray = response2array(response, start, end);
       const tcArray = response2array(targetResponse, start, end);
       const arrLength = Math.min(rpArray.length, tcArray.length);
@@ -1971,7 +2059,16 @@
           idx = Object.keys(pairAvg.results)[0];
         }
         const rolloff = await getLow3dBPoint(idx);
-        m3dBPoints[i] = [Math.round(rolloff), 10000]; // audy mic generally garbage past 10k and messes with high shelf
+
+        if (isRP22mode == true) {
+          m3dBPoints[i] = [Math.round(rolloff), 15000];
+          console.info("calculateRolloffs: applying CEDIA RP22 - 15000 rolloff");
+        } else {
+          m3dBPoints[i] = [Math.round(rolloff), 12500]; // audy mic generally garbage past 10k and messes with high shelf
+          console.info("calculateRolloffs: applying Default - 12500 rolloff");
+        }
+
+
         let initialXO = findNearestXO(rolloff);
         // edge case for no subwoofer
         if (noSub && cmdIds.endsWith("FL & FR")) {
@@ -1979,7 +2076,13 @@
         }
         customCrossover[i] = initialXO;
         if (!singleChannel) {
-          m3dBPoints[i + 1] = [Math.round(rolloff), 10000]; // audy mic generally garbage past 10k and messes with high shelf
+          if (isRP22mode == true) {
+            m3dBPoints[i + 1] = [Math.round(rolloff), 15000];
+            console.info("calculateRolloffs: applying CEDIA RP22 - 15000 rolloff");
+          } else {
+            m3dBPoints[i + 1] = [Math.round(rolloff), 12500]; // audy mic generally garbage past 10k and messes with high shelf
+            console.info("calculateRolloffs: applying Default - 12500 rolloff");
+          }
           customCrossover[i + 1] = initialXO;
           i++;
           await postDelete(idx); // cleanup
@@ -2378,7 +2481,24 @@
       //await fetch_mREW();      
       const targetArray = response2array(targetResponse, start, end);
       const targetSPL = targetArray.reduce((acc, val) => acc + val, 0) / targetArray.length;
-      const freqResponse = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+      let freqResponse;
+      // Greater than 500 = speakers 1/1 smoothing
+      if (start >= 500 && isRP22mode == true) {
+        // const freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
+        freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
+        console.info("getTrim: applying CEDIA RP22 - 1/1 smoothing - assume speakers");
+        // Less than 500 = subwoofer 1/3 smoothing     
+      } else if (start < 500 && isRP22mode == true) {
+        // const freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
+        freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
+        console.info("getTrim: applying CEDIA RP22 - 1/3 smoothing - assume subwoofer(s)");
+        // normal mode
+      } else {
+        // const freqResponse = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+        // freqResponse = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+        freqResponse = await fetchSafe('frequency-response?smoothing=1%2F6&ppo=96', idx);
+        console.info("getTrim: applying Default - 1/6 smoothing");
+      }
       const freqArray = response2array(freqResponse, start, end);
       const freqSPL = freqArray.reduce((acc, val) => acc + val, 0) / freqArray.length;
 
@@ -2392,17 +2512,6 @@
       return Math.round(offset * 2) / 2; // round to nearest 0.5
     }
 
-    /*
-    async function getSpeakerTrim(idx) {
-      const spTrim = await getTrim(idx, 500, 2000);
-      return spTrim;
-    }
-
-    async function getSubTrim(idx) {
-      const subTrim = await getTrim(idx, 30, 80);
-      return subTrim;
-    }
-    */
     async function getSpeakerTrim(idx) {
       return await getTrim(idx, 500, isRP22mode ? 16000 : 2000);
     }
@@ -5648,10 +5757,7 @@
     }
     // Initialize the console logger
     initializeConsoleLogger();
-
-
   </script>
-
 </body>
 
 </html>
