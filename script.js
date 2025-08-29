@@ -1,3 +1,4 @@
+// ClariQ Next 0.0.1 - 29-08-2025 @ 18:37
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -122,7 +123,6 @@ document.addEventListener("DOMContentLoaded", function () {
 			themeToggle.classList.remove("active");
 			if (slider) slider.innerHTML = getEmoji("🌙", "🌙");
 		}
-
 		window.AppCalibration.cleanup.addEventListener(themeToggle, "click", toggleTheme);
 	}
 });

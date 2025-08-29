@@ -1,3 +1,4 @@
+/* ClariQ Next 0.0.1 - 29-08-2025 @ 18:37 */
 :root {
 	--primary-color: #2563eb;
 	--secondary-color: #3b82f6;
@@ -338,14 +339,14 @@ body {
 	background-color: red;
 }
 
-/* SLIDER NEW! */
+/*SLIDER NEW!*/
 .slider-container {
 	background: var(--card-background);
 	padding: 40px;
 	border-radius: 12px;
 	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 	transition: background-color 0.3s ease;
-	/* added */
+	/*added*/
 	border: 2px dashed var(--file-upload-border);
 	margin-top: 10px;
 	padding-top: 20px;
