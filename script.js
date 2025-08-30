@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.2 - 29-08-2025 @ 22:20
+// ClariQ Next 0.0.3 - 30-08-2025 @ 09:53
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -483,10 +483,14 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (currentStep === 1) {
 			const cinema_type_radioButtons = currentStepElement.querySelectorAll('input[name="cinema_type"]');
 			const sub_inversion_radioButtons = currentStepElement.querySelectorAll('input[name="sub_inversion"]');
+			const ade_radioButtons = currentStepElement.querySelectorAll('input[name="script_ade"]');
+			const ahe_radioButtons = currentStepElement.querySelectorAll('input[name="script_ahe"]');
 			const is_cinema_type_Selected = Array.from(cinema_type_radioButtons).some((radio) => radio.checked);
 			const is_sub_inversion_Selected = Array.from(sub_inversion_radioButtons).some((radio) => radio.checked);
+			const is_ade_Selected = Array.from(ade_radioButtons).some((radio) => radio.checked);
+			const is_ahe_Selected = Array.from(ahe_radioButtons).some((radio) => radio.checked);
 			if (continueButton) {
-				continueButton.disabled = !(is_cinema_type_Selected && is_sub_inversion_Selected);
+				continueButton.disabled = !(is_cinema_type_Selected && is_sub_inversion_Selected && is_ade_Selected && is_ahe_Selected);
 			}
 		} else if (currentStep === 2) {
 			const isFileUploaded = fileInput && fileInput.files.length > 0;
@@ -666,6 +670,38 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (typeof isRP22mode !== "undefined") isRP22mode = true;
 				isRP22mode = true;
 			}
+
+			// CRITICAL: Keep original radio button handlers EXACTLY as they were
+			document.querySelectorAll('input[name="script_ade"]').forEach((radio) => {
+				window.AppCalibration.cleanup.addEventListener(radio, "change", (e) => {
+					if (e.target.value === "0") {
+						console.log("Advanced Dialog Enhancement OFF");
+						if (typeof RP22DialogEnhancementFilter !== "undefined") RP22DialogEnhancementFilter = false;
+						RP22DialogEnhancementFilter = false;
+					} else if (e.target.value === "1") {
+						console.warn("Advanced Dialog Enhancement ON");
+						if (typeof RP22DialogEnhancementFilter !== "undefined") RP22DialogEnhancementFilter = true;
+						RP22DialogEnhancementFilter = true;
+					}
+					updateContinueButtonState();
+				});
+			});
+
+			// CRITICAL: Keep original radio button handlers EXACTLY as they were
+			document.querySelectorAll('input[name="script_ahe"]').forEach((radio) => {
+				window.AppCalibration.cleanup.addEventListener(radio, "change", (e) => {
+					if (e.target.value === "0") {
+						console.log("Advanced Hearing Loss Enhancement OFF");
+						if (typeof AdvancedHearinglossFilter !== "undefined") AdvancedHearinglossFilter = false;
+						AdvancedHearinglossFilter = false;
+					} else if (e.target.value === "1") {
+						console.warn("Advanced Hearing Loss Enhancement ON");
+						if (typeof AdvancedHearinglossFilter !== "undefined") AdvancedHearinglossFilter = true;
+						AdvancedHearinglossFilter = true;
+					}
+					updateContinueButtonState();
+				});
+			});
 
 			const targetLevelDisplay = document.getElementById("target-level-display");
 			if (targetLevelDisplay && typeof targetLevel !== "undefined") {

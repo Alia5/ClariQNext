@@ -14,7 +14,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.2 - 29-08-2025 @ 22:20";
+    const nextversion = "ClariQ Next 0.0.3 - 30-08-2025 @ 09:53";
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
       "X8500H", "R-A110", "-S730H", "-S740H", "-S750H", "-S760H", "-S930H", "-S940H", "-S950H", "-S960H", "X1400H", "X1500H", "X1600H",
       "X1700H", "X2400H", "X2500H", "X2600H", "X2700H", "X3400H", "X3500H", "X3600H", "X3700H", "X4300H", "X4400H", "X4500H", "X4700H",
@@ -33,12 +33,12 @@
     const models70xo = ["A-900H", "MA 70S", "-S970H", "X2800H", "-S670H", " AV 10", " AV 20", "VR-A1H", "VC-A1H", "X3800H", "X4800H",
       "EMA 30", "EMA 40", "EMA 50", "X6800H", "R-A10H", "C-A10H"];
 
-    const baseUrl = 'http://localhost:4735/measurements', retryDelay = 500; /*rewDelay = 5;*/
+    const baseUrl = 'http://localhost:4735/measurements', retryDelay = 500;
     let adyContents, fileName, sOs, isCirrusLogic, flDist, nChannels, nSpeakers, nSubs, noCenter;
     let targetCurvePath, targetCurveName, targetResponse, noInversion = false, swInvMsg = "";
     let bassMode = "Standard", noSub = false, subLoTrim, subHiTrim, subLoDelay, subHiDelay;
-    let minXO = 40, maxXO = 250, previousDelay = null, swChannelCount = 0, dialogueEnhancer = false;
-    const freqIndex = [40, 60, 80, 90, 100, 110, 120, 150, 200, 250]; // common denominator
+    let minXO = 40, maxXO = 250, previousDelay = null, swChannelCount = 0;
+    const freqIndex = [40, 60, 80, 90, 100, 110, 120, 150, 200, 250];
     const customLevel = [], customDistance = [], customCrossover = [];
     const mSec = [], invertSub = [], commandId = [];
     const m3dBPoints = {};
@@ -64,6 +64,11 @@
     let estimatedDistances = [];
     // CREATE ARRAY TO STORE FINAL XO'S DISTANCES 
     let RP22BestXO = [];
+    // ADVANCED CEDIA RP22 DIALOG FILTERS
+    let RP22DialogEnhancementFilter = false;
+    // ADVANCED HEARING LOSS FILTER
+    let AdvancedHearinglossFilter = false;
+
     // SPEED DELAY BASED ON CPU CORES LIKE BEFORE
     // Add delay based on CPU cores ("logical")
     // Don't have to set speedDelay each time anymore!
@@ -211,9 +216,36 @@
               <input type="radio" id="radio_script_mode_manual" name="script_mode" value="1">
             </div>
           </div>
+
+          <br />
+          <div class="row g-4">
+            <!--<h3 class="mb-4">Advanced Filters: Dialog Enhancement</h3>-->
+            <h3 class="mb-4">Advanced Filters</h3>
+            <div class="col-md-4">
+              <label for="radio_script_ade_off">Advanced Dialog Enhancement OFF</label><br>
+              <input type="radio" id="radio_script_ade_off" name="script_ade" value="0" required checked="checked">
+            </div>
+            <div class="col-md-4">
+              <label for="radio_script_ade_on">Advanced Dialog Enhancement ON</label><br>
+              <input type="radio" id="radio_script_ade_on" name="script_ade" value="1">
+            </div>
+          </div>
+
+          <div class="row g-4">
+            <!--<h3 class="mb-4">Advanced Filters: Hearing Loss Enhancement</h3>-->
+            <div class="col-md-4">
+              <label for="radio_script_ahe_off">Advanced Hearing Loss Enhancement OFF</label><br>
+              <input type="radio" id="radio_script_ahe_off" name="script_ahe" value="0" required checked="checked">
+            </div>
+            <div class="col-md-4">
+              <label for="radio_script_ahe_on">Advanced Hearing Loss Enhancement ON</label><br>
+              <input type="radio" id="radio_script_ahe_on" name="script_ahe" value="1">
+            </div>
+          </div>
+
           <br />
           <div class="mb-4">
-            <h3 class="mb-4">Usage</h3>
+            <h3 class="mb-4 warning">Usage</h3>
             <ul>
               <li>Download and install the free room correction software Room EQ Wizard (v5.40
                 Beta) on
@@ -273,9 +305,12 @@
               </ul>
 
             </ul>
-            <li><strong>Please keep REW on 'SPL & Phase' tab and stay on this web page until optimization is
+            <li><strong class="warning">Please keep REW on 'SPL & Phase' tab and stay on this web page until
+                optimization
+                is
                 completed!</strong></li>
             </ul>
+            <br />
             <label class="form-label" id="resumeUploadlabel" for="resumeUpload">.ady Upload</label>
             <div class="file-upload" id="resumeUpload">
               <input type="file" id="resume" class="d-none" accept=".ady">
@@ -1289,6 +1324,18 @@
         console.info(`  Subwoofer polarity inversion allowed: Yes.`);
       }
 
+      if (RP22DialogEnhancementFilter == true || RP22DialogEnhancementFilter == 1) {
+        console.warn(`  Advanced Dialog Enhancement Filters: ${RP22DialogEnhancementFilter}`);
+      } else {
+        console.info(`  Advanced Dialog Enhancement Filters: ${RP22DialogEnhancementFilter}`);
+      }
+
+      if (AdvancedHearinglossFilter == true || AdvancedHearinglossFilter == 1) {
+        console.warn(`  Advanced Hearing Loss Enhancement Filters: ${AdvancedHearinglossFilter}`);
+      } else {
+        console.info(`  Advanced Hearing Loss Enhancement Filters: ${AdvancedHearinglossFilter}`);
+      }
+
       if (needsSorting) {
         console.warn(`  Measurements are custom sorted`);
       } else {
@@ -1319,17 +1366,18 @@
       let baseMessage = "Resetting IR windows, EQ type, target shape and smoothing for all measurements..."
       for (let q = 1; q <= mCount; q++) {
         await postSafe(`${baseUrl}/${q}/ir-windows`, { leftWindowType: "Rectangular", rightWindowType: "Rectangular" }, "Update processed");
-        await new Promise((resolve) => setTimeout(resolve, speedDelay));
+        await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
         await postSafe(`${baseUrl}/${q}/equaliser`, { manufacturer: "Generic", model: "Generic" }, "Equaliser selected");
-        await new Promise((resolve) => setTimeout(resolve, speedDelay));
+        await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
         await postSafe(`${baseUrl}/${q}/target-settings`, { shape: "None" }, "Update processed");
-        await new Promise((resolve) => setTimeout(resolve, speedDelay));
+        await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
         await postNext('Smooth', q, { smoothing: "1/48" });
-        await new Promise((resolve) => setTimeout(resolve, speedDelay));
+        await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
         console.infoUpdate(`${baseMessage} (${q}/${mCount})`);
       }
       await console.infoUpdate("Resetting default equalizer to 'Generic/Generic'...");
       await postSafe(`http://localhost:4735/eq/default-equaliser`, { manufacturer: "Generic", model: "Generic" }, "Default equaliser changed");
+      await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
       const firstTitle = measurements[1].title;
 
       console.infoUpdate(`Checking measurement names, indices and sorting...`);
@@ -1874,18 +1922,165 @@
           console.debug(`${commandId[i]} could not be equalized!`);
         }
 
-        if (commandId[i] === "C" && dialogueEnhancer) {
+        // SW1 should suffice here
+        if (AdvancedHearinglossFilter && commandId[i] !== "SW" && commandId[i] !== "SW1" && commandId[i] !== "SWMIX") {
+          // console.log("APPLYING Advanced Hearing Loss Compensation Filters");
+          console.log(`APPLYING Advanced Hearing Loss Compensation Filters to:`, commandId[i]);
+          console.info("Enhancement targets:");
+
+          // Gentle low-mid presence for speech fullness
+          await postSafe(`${baseUrl}/${i}/filters`, {
+            filters: [{
+              "index": 11,
+              "type": "PK",
+              "enabled": true,
+              "isAuto": false,
+              "frequency": 1000, // Low-mid speech body
+              "gaindB": 1.5,     // Gentle boost for balance
+              "q": 0.9
+            }]
+          }, "Filters set");
+          console.info("- 1kHz: +1.5dB (Speech body and presence)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+
+          // Boost critical consonant recognition (hearing loss usually hits here first)
+          await postSafe(`${baseUrl}/${i}/filters`, {
+            filters: [{
+              "index": 12,
+              "type": "PK",
+              "enabled": true,
+              "isAuto": false,
+              "frequency": 2500, // Consonant range
+              "gaindB": 3.0,     // Stronger boost for clarity
+              "q": 1.2
+            }]
+          }, "Filters set");
+          console.info("- 2.5kHz: +3.0dB (Consonant intelligibility)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+
+          // Further boost higher consonants (common hearing loss band)
+          await postSafe(`${baseUrl}/${i}/filters`, {
+            filters: [{
+              "index": 13,
+              "type": "PK",
+              "enabled": true,
+              "isAuto": false,
+              "frequency": 4000, // High consonant clarity
+              "gaindB": 4.0,     // Strong boost where hearing loss is common
+              "q": 1.5
+            }]
+          }, "Filters set");
+          console.info("- 4kHz: +4.0dB (High consonant clarity boost)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+
+          // Add extra lift in upper range for "s" and "sh" sounds
+          await postSafe(`${baseUrl}/${i}/filters`, {
+            filters: [{
+              "index": 14,
+              "type": "PK",
+              "enabled": true,
+              "isAuto": false,
+              "frequency": 6000, // Upper speech & sibilant detail
+              "gaindB": 3.0,
+              "q": 1.8
+            }]
+          }, "Filters set");
+          console.info("- 6kHz: +3.0dB (Upper speech and sibilant detail)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+
+          // Optional high shelf lift to help with audibility of brighter details
+          await postSafe(`${baseUrl}/${i}/filters`, {
+            filters: [{
+              "index": 15,
+              "type": "HS",
+              "enabled": true,
+              "isAuto": false,
+              "frequency": 8000, // Boost air & brightness
+              "gaindB": 2.0
+            }]
+          }, "Filters set");
+          console.info("- 8kHz+: +2.0dB (High frequency audibility)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+          console.log("Advanced Hearing Loss Compensation Filters applied successfully");
+        }
+
+
+        if (commandId[i] === "C" && RP22DialogEnhancementFilter) {
+          // console.log("APPLYING CEDIA RP22 Advanced Dialog Enhancement Filters");
+          console.log(`APPLYING CEDIA RP22 Advanced Dialog Enhancement Filters to:`, commandId[i]);
+          console.info("Enhancement targets:");
+
+          await postSafe(`${baseUrl}/${i}/filters`, {
+            filters: [{
+              "index": 16, // need to make sure it's available
+              "type": "PK", // Peaking filter
+              "enabled": true,
+              "isAuto": false, // Manual tuning for dialog enhancement
+              "frequency": 1600, // Peak speech intelligibility frequency
+              "gaindB": 2.5, // Moderate boost for clarity without harshness
+              "q": 1.2 // Moderately wide Q for smooth enhancement
+            }]
+          }, "Filters set");
+          console.info("- 1.6kHz: +2.5dB (Peak speech intelligibility)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+
+          await postSafe(`${baseUrl}/${i}/filters`, {
+            filters: [{
+              "index": 17, // need to make sure it's available
+              "type": "PK",
+              "enabled": true,
+              "isAuto": false,
+              "frequency": 3000, // Critical consonant clarity range
+              "gaindB": 3.0, // Key boost for dialog intelligibility  
+              "q": 1.5 // Focused on consonant frequencies
+            }]
+          }, "Filters set");
+          console.info("- 3kHz: +3.0dB (Critical consonant clarity)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+
+          await postSafe(`${baseUrl}/${i}/filters`, {
+            filters: [{
+              "index": 18, // need to make sure it's available
+              "type": "PK",
+              "enabled": true,
+              "isAuto": false,
+              "frequency": 800, // Lower speech presence
+              "gaindB": 1.5, // Gentle boost for warmth and body
+              "q": 0.8 // Wide Q for natural sound
+            }]
+          }, "Filters set");
+          console.info("- 800Hz: +1.5dB (Speech warmth and body)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+
+          await postSafe(`${baseUrl}/${i}/filters`, {
+            filters: [{
+              "index": 19, // need to make sure it's available
+              "type": "PK",
+              "enabled": true,
+              "isAuto": false,
+              "frequency": 4500, // Upper consonant range
+              "gaindB": 2.0, // Moderate boost for speech clarity
+              "q": 1.8 // Narrow Q to avoid harshness
+            }]
+          }, "Filters set");
+          console.info("- 4.5kHz: +2.0dB (Upper consonant definition)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+
           await postSafe(`${baseUrl}/${i}/filters`, {
             filters: [{
               "index": 20, // need to make sure it's available
-              "type": "PK",
+              "type": "HS", // High shelf
               "enabled": true,
-              "isAuto": true,
-              "frequency": 1500,
-              "gaindB": 1.5,
-              "q": 0.5
+              "isAuto": false,
+              "frequency": 5000, // Gentle rolloff above 5kHz
+              "gaindB": -1.0 // Slight attenuation to avoid sibilance
+              // "q": 0.7 // Gentle slope
             }]
           }, "Filters set");
+          console.info("- 5kHz+: -1.0dB (Sibilance control)");
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+
+          console.log("CEDIA RP22 Advanced Dialog Enhancement Filters applied successfully");
         }
 
         // generate filters & auto level it
@@ -2482,21 +2677,20 @@
       const targetArray = response2array(targetResponse, start, end);
       const targetSPL = targetArray.reduce((acc, val) => acc + val, 0) / targetArray.length;
       let freqResponse;
-      // Greater than 500 = speakers 1/1 smoothing
-      if (start >= 500 && isRP22mode == true) {
-        // const freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
+      if (start == 200 && end == 2000 && isRP22mode == false) {
+        freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
+        console.info("getTrim: applying Default - 1/6 smoothing - assume speakers");
+      } else if (start == 200 && end == 2000 && isRP22mode == true) {
         freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
         console.info("getTrim: applying CEDIA RP22 - 1/1 smoothing - assume speakers");
-        // Less than 500 = subwoofer 1/3 smoothing     
+      } else if (start >= 500 && isRP22mode == true) {
+        freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
+        console.info("getTrim: applying CEDIA RP22 - 1/1 smoothing - assume speakers");
       } else if (start < 500 && isRP22mode == true) {
-        // const freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
         freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
         console.info("getTrim: applying CEDIA RP22 - 1/3 smoothing - assume subwoofer(s)");
-        // normal mode
       } else {
-        // const freqResponse = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
-        // freqResponse = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
-        freqResponse = await fetchSafe('frequency-response?smoothing=1%2F6&ppo=96', idx);
+        freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
         console.info("getTrim: applying Default - 1/6 smoothing");
       }
       const freqArray = response2array(freqResponse, start, end);
@@ -2549,7 +2743,13 @@
 
     async function align4system(ind1, ind2, xo) {
       const start = Math.round(xo / 2), end = Math.round(xo * 2);
-      const [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+      // const [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+      let [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+
+      // Clamp and fix signs
+      loDelay = Math.max(-1000, Math.min(0, -Math.abs(loDelay))); // force negative
+      hiDelay = Math.max(0, Math.min(1000, Math.abs(hiDelay)));   // force positive
+
       console.info(`Available delay range: ${loDelay.toFixed(2)}ms <-> ${hiDelay.toFixed(2)}ms`);
       let isInverted = false, isPossible = false, requiredDelay = NaN, bestFreq = NaN, maxSum = -Infinity;
       await postSafe("http://localhost:4735/alignment-tool/index-a", ind1, "selected as measurement A");
@@ -2698,9 +2898,9 @@
       for (let i = 1; i <= nSpeakers; i++) {
         console.infoUpdate(`Generating final output for channel - ${commandId[i]}`);
         const isLarge = customCrossover[i] === "L";
-        // const finalResponseName = commandId[i] + (isLarge ? "final-Large" : `final-${customCrossover[i]}hz-xo`);
         let finalResponseName = commandId[i] + "final";
-        finalResponseName += (commandId[i] === "C" && dialogueEnhancer) ? "-DE" : "";
+        finalResponseName += (commandId[i] === "C" && RP22DialogEnhancementFilter) ? "-ADE" : "";
+        finalResponseName += (AdvancedHearinglossFilter) ? "-AHE" : "";
         finalResponseName += isLarge ? "-Large" : `-${customCrossover[i]}hz-xo`;
         const eqSpeaker = nChannels + 2 * i;
         const spWithHPF = await genSpeaker(eqSpeaker, customCrossover[i]);
@@ -3158,8 +3358,9 @@
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const timestamp = `${year}-${month}${day}-${hours}${minutes}`;
       const tcName = targetCurveName === "" ? "DEQ" : targetCurveName;
-
-      downloadLink.download = getadyName(fileName, "_" + (dialogueEnhancer ? "DE_" : "")
+      downloadLink.download = getadyName(fileName, "_"
+        + (RP22DialogEnhancementFilter ? "ADE_" : "")
+        + (AdvancedHearinglossFilter ? "AHE_" : "")
         + swInvMsg + `${tcName}_ISO226_`
         + `ClariQNext_${timestamp}.ady`);
       downloadLink.style.display = "none";
@@ -3270,7 +3471,6 @@
     }
 
     async function fetchAlign(extUrl) {
-      // if (!window.navigator.platform.startsWith("Win")) { await new Promise(resolve => setTimeout(resolve, rewDelay)); }
       if (!window.navigator.platform.startsWith("Win")) { await new Promise(resolve => setTimeout(resolve, speedDelay)); }
       try {
         const requestUrl = `http://localhost:4735/alignment-tool/${extUrl}`;
@@ -3291,7 +3491,6 @@
     }
 
     async function postNext(processName, indices, parameters = null) {
-      // if (!window.navigator.platform.startsWith("Win")) { await new Promise(resolve => setTimeout(resolve, rewDelay)); }
       if (!window.navigator.platform.startsWith("Win")) { await new Promise(resolve => setTimeout(resolve, speedDelay)); }
       let requestUrl;
       let body;
@@ -3349,7 +3548,6 @@
     }
 
     async function postSafe(requestUrl, parameters, message) {
-      // if (!window.navigator.platform.startsWith("Win")) { await new Promise(resolve => setTimeout(resolve, rewDelay)); }
       if (!window.navigator.platform.startsWith("Win")) { await new Promise(resolve => setTimeout(resolve, speedDelay)); }
       const fetchData = async () => {
         const response = await fetch(requestUrl, {
@@ -3479,7 +3677,6 @@
     }
 
     async function postDelete(indice) {
-      // if (!window.navigator.platform.startsWith("Win")) { await new Promise(resolve => setTimeout(resolve, rewDelay)); }
       if (!window.navigator.platform.startsWith("Win")) { await new Promise(resolve => setTimeout(resolve, speedDelay)); }
       const mDeleted = `Measurement ${indice} deleted`
       while (true) {
@@ -3725,7 +3922,6 @@
       }
     }
 
-    // CEDIA Assessment - Enhanced Implementation with Professional Standards and Advanced Acoustics
     // CEDIA Assessment - Enhanced Implementation with Professional Standards and Advanced Acoustics
     class CEDIAPerformanceScorer {
       constructor() {
@@ -3995,7 +4191,7 @@
             sOs: typeof sOs !== 'undefined' ? String(sOs) : 'Unknown',
             isCirrusLogic: typeof isCirrusLogic !== 'undefined' ? Boolean(isCirrusLogic) : false,
             freqIndex: this.parseFrequencyArray(typeof freqIndex !== 'undefined' ? freqIndex : null),
-            dialogueEnhancer: typeof dialogueEnhancer !== 'undefined' ? Boolean(dialogueEnhancer) : false,
+            RP22DialogEnhancementFilter: typeof RP22DialogEnhancementFilter !== 'undefined' ? Boolean(RP22DialogEnhancementFilter) : false,
             needsSorting: typeof needsSorting !== 'undefined' ? Boolean(needsSorting) : false,
 
             // Time alignment - Enhanced parsing for timing data
