@@ -16,7 +16,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.5 - 30-08-2025 @ 20:16";
+    const nextversion = "ClariQ Next 0.0.6 - 30-08-2025 @ 21:05";
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
       "X8500H", "R-A110", "-S730H", "-S740H", "-S750H", "-S760H", "-S930H", "-S940H", "-S950H", "-S960H", "X1400H", "X1500H", "X1600H",
       "X1700H", "X2400H", "X2500H", "X2600H", "X2700H", "X3400H", "X3500H", "X3600H", "X3700H", "X4300H", "X4400H", "X4500H", "X4700H",
@@ -3135,8 +3135,16 @@
           console.infoUpdate(`Generating final output for channel - ${commandId[i]}`);
           const isLarge = customCrossover[i] === "L";
           let finalResponseName = commandId[i] + "final";
-          finalResponseName += (commandId[i] === "C" && RP22DialogEnhancementFilter) ? "-ADE" : "";
-          finalResponseName += (AdvancedHearinglossFilter) ? "-AHE" : "";
+          /*finalResponseName += (commandId[i] === "C" && RP22DialogEnhancementFilter) ? "-ADE" : "";*/
+          finalResponseName += (commandId[i] === "C" && AdvancedFiltersType === "DIALOGadvanced") ? "-ADF" : "";
+          finalResponseName += (AdvancedFiltersType === "HLOSSresearch") ? "-AHF" : "";
+          finalResponseName += (AdvancedFiltersType === "HLOSSmoderate") ? "-AHF" : "";
+          finalResponseName += (AdvancedFiltersType === "HLOSSsevere") ? "-AHF" : "";
+          finalResponseName += (AdvancedFiltersType === "HLOSSoriginal") ? "-AHF" : "";
+          finalResponseName += (AdvancedFiltersType === "GAMINGcompetitive") ? "-AGF" : "";
+          finalResponseName += (AdvancedFiltersType === "GAMINGimmersive") ? "-AGF" : "";
+          finalResponseName += (AdvancedFiltersType === "GAMINGvoice") ? "-AGF" : "";
+          finalResponseName += (AdvancedFiltersType === "GAMINGbalanced") ? "-AGF" : "";
           finalResponseName += isLarge ? "-Large" : `-${customCrossover[i]}hz-xo`;
           const eqSpeaker = nChannels + 2 * i;
           const spWithHPF = await genSpeaker(eqSpeaker, customCrossover[i]);
@@ -3595,8 +3603,18 @@
         const timestamp = `${year}-${month}${day}-${hours}${minutes}`;
         const tcName = targetCurveName === "" ? "DEQ" : targetCurveName;
         downloadLink.download = getadyName(fileName, "_"
-          + (RP22DialogEnhancementFilter ? "ADE_" : "")
-          + (AdvancedHearinglossFilter ? "AHE_" : "")
+          //  + (RP22DialogEnhancementFilter ? "ADE_" : "")
+          + (AdvancedFiltersType === "DIALOGadvanced" ? "ADF_" : "")
+          + (AdvancedFiltersType === "HLOSSresearch" ? "AHF_" : "")
+          + (AdvancedFiltersType === "HLOSSmoderate" ? "AHF_" : "")
+          + (AdvancedFiltersType === "HLOSSsevere" ? "AHF_" : "")
+          + (AdvancedFiltersType === "HLOSSoriginal" ? "AHF_" : "")
+          + (AdvancedFiltersType === "GAMINGcompetitive" ? "AGF_" : "")
+          + (AdvancedFiltersType === "GAMINGimmersive" ? "AGF_" : "")
+          + (AdvancedFiltersType === "GAMINGvoice" ? "AGF_" : "")
+          + (AdvancedFiltersType === "GAMINGbalanced" ? "AGF_" : "")
+          //  + swInvMsg + `${tcName}_ISO226_ClariQNext_${timestamp}.ady`);
+          // + (AdvancedFiltersType ? "AHE_" : "")
           + swInvMsg + `${tcName}_ISO226_`
           + `ClariQNext_${timestamp}.ady`);
         downloadLink.style.display = "none";
@@ -4427,7 +4445,7 @@
               sOs: typeof sOs !== 'undefined' ? String(sOs) : 'Unknown',
               isCirrusLogic: typeof isCirrusLogic !== 'undefined' ? Boolean(isCirrusLogic) : false,
               freqIndex: this.parseFrequencyArray(typeof freqIndex !== 'undefined' ? freqIndex : null),
-              RP22DialogEnhancementFilter: typeof RP22DialogEnhancementFilter !== 'undefined' ? Boolean(RP22DialogEnhancementFilter) : false,
+              //RP22DialogEnhancementFilter: typeof RP22DialogEnhancementFilter !== 'undefined' ? Boolean(RP22DialogEnhancementFilter) : false,
               needsSorting: typeof needsSorting !== 'undefined' ? Boolean(needsSorting) : false,
 
               // Time alignment - Enhanced parsing for timing data
