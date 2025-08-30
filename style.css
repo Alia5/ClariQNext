@@ -1,4 +1,4 @@
-/* ClariQ Next 0.0.4 - 30-08-2025 @ 13:35 */
+/* ClariQ Next 0.0.5 - 30-08-2025 @ 20:16 */
 :root {
 	--primary-color: #2563eb;
 	--secondary-color: #3b82f6;
@@ -499,3 +499,50 @@ label {
 	margin-bottom: 30px;
 	max-width: 64px;
 }
+
+.font-toggle {
+	position: absolute;
+	top: 0;
+	right: 1;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+/* Load OpenDyslexic font from local files */
+@font-face {
+	font-family: "OpenDyslexic";
+	src: url("OpenDyslexic-Regular.eot"); /* IE9 Compat Modes */
+	src: url("OpenDyslexic-Regular.eot?#iefix") format("embedded-opentype"), /* IE6-IE8 */ url("OpenDyslexic-Regular.woff2") format("woff2"), /* Modern Browsers */ url("OpenDyslexic-Regular.woff") format("woff"),
+		/* Pretty Modern Browsers */ url("OpenDyslexic-Regular.otf") format("opentype"); /* Fallback */
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap; /* Improves loading performance */
+}
+
+/* CSS for dyslexic-friendly fonts */
+body[data-font="dyslexic"] {
+	font-family: "OpenDyslexic", "Comic Sans MS", "Arial", sans-serif;
+	/* font-size: 0.9em;  Scale down the font size slightly */
+}
+
+body[data-font="dyslexic"] * {
+	font-family: inherit !important;
+}
+
+/* Dyslexic-friendly properties */
+/*
+body[data-font="dyslexic"] {
+		letter-spacing: 0.12em;
+	word-spacing: 0.16em;
+	line-height: 1.5;
+}
+*/
+
+/*
+body[data-font="dyslexic"] p,
+body[data-font="dyslexic"] div,
+body[data-font="dyslexic"] span {
+	text-align: left; // Avoid justified text which can be harder for dyslexic readers //
+}
+*/

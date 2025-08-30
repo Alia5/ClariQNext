@@ -16,7 +16,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.4 - 30-08-2025 @ 13:35";
+    const nextversion = "ClariQ Next 0.0.5 - 30-08-2025 @ 20:16";
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
       "X8500H", "R-A110", "-S730H", "-S740H", "-S750H", "-S760H", "-S930H", "-S940H", "-S950H", "-S960H", "X1400H", "X1500H", "X1600H",
       "X1700H", "X2400H", "X2500H", "X2600H", "X2700H", "X3400H", "X3500H", "X3600H", "X3700H", "X4300H", "X4400H", "X4500H", "X4700H",
@@ -52,6 +52,8 @@
     let expectedOrder = [];
     // Dark mode state
     let isDarkMode = true;
+    // Dyslexic Mode
+    let isDyslexicMode = false;
     // cedia specific
     let isRP22mode = false;
     let RP22subnminXO;
@@ -66,12 +68,10 @@
     let estimatedDistances = [];
     // CREATE ARRAY TO STORE FINAL XO'S DISTANCES 
     let RP22BestXO = [];
-    // ADVANCED CEDIA RP22 DIALOG FILTERS
-    let RP22DialogEnhancementFilter = false;
-    // ADVANCED HEARING LOSS FILTER
-    let AdvancedHearinglossFilter = false;
-    // Hearing loss type: "research", "moderate", "severe", "original", or null
-    let hearingLossType = "research";
+
+    // CONDENCED VERSION
+    let AdvancedFilters = false;
+    let AdvancedFiltersType = "null";
 
     // SPEED DELAY BASED ON CPU CORES LIKE BEFORE
     // Add delay based on CPU cores ("logical")
@@ -115,6 +115,14 @@
           <!--<span class="theme-label">☀️</span>-->
           <div class="toggle-switch active" id="themeToggle">
             <div class="toggle-slider">☀️</div>
+          </div>
+          <!--<span class="theme-label">🌙</span>-->
+        </div>
+
+        <div class="font-toggle">
+          <!--<span class="theme-label">☀️</span>-->
+          <div class="toggle-switch active" id="dyslexicToggle">
+            <div class="toggle-slider">🔤</div>
           </div>
           <!--<span class="theme-label">🌙</span>-->
         </div>
@@ -224,39 +232,34 @@
 
           <br />
           <div class="row g-4">
-            <!--<h3 class="mb-4">Advanced Filters: Dialog Enhancement</h3>-->
             <h3 class="mb-4">Advanced Filters</h3>
             <div class="col-md-4">
-              <label for="radio_script_ade_off">Advanced Dialog Enhancement OFF</label><br>
-              <input type="radio" id="radio_script_ade_off" name="script_ade" value="0" required checked="checked">
+              <label for="radio_script_af_off">Advanced Filters OFF</label><br>
+              <input type="radio" id="radio_script_af_off" name="script_af" value="0" required checked="checked">
             </div>
             <div class="col-md-4">
-              <label for="radio_script_ade_on">Advanced Dialog Enhancement ON</label><br>
-              <input type="radio" id="radio_script_ade_on" name="script_ade" value="1">
+              <label for="radio_script_af_on">Advanced Filters ON</label><br>
+              <input type="radio" id="radio_script_af_on" name="script_af" value="1">
             </div>
           </div>
 
           <div class="row g-4">
-            <!--<h3 class="mb-4">Advanced Filters: Hearing Loss Enhancement</h3>-->
             <div class="col-md-4">
-              <label for="radio_script_ahe_off">Advanced Hearing Loss Enhancement OFF</label><br>
-              <input type="radio" id="radio_script_ahe_off" name="script_ahe" value="0" required checked="checked">
-            </div>
-            <div class="col-md-4">
-              <label for="radio_script_ahe_on">Advanced Hearing Loss Enhancement ON</label><br>
-              <input type="radio" id="radio_script_ahe_on" name="script_ahe" value="1">
-            </div>
-
-            <div class="col-md-4">
-              <label for="script_ahe_type">Advanced Hearing Loss Enhancement Type</label><br>
-              <select name="script_ahe_type" id="script_ahe_type">
+              <label for="script_af_type">Advanced Filters Type</label><br>
+              <select name="script_af_type" id="script_af_type">
                 <option value="null" selected>none</option>
-                <option value="research">research / (presbycusis patterns)</option>
-                <option value="moderate">moderate / (mild hearing loss)</option>
-                <option value="severe">severe / (⚠️high gains)</option>
-                <option value="original">original / 0.0.3 values</option>
+                <option value="DIALOGadvanced">Advanced Dialog Enhancement - CEDIA RP22</option>
+                <option value="HLOSSresearch">Hearing Loss >> Research-Based Hearing Loss Compensation (presbycusis
+                  patterns)</option>
+                <option value="HLOSSmoderate">Hearing Loss >> Moderate Hearing Loss Compensationmoderate (mild hearing
+                  loss)</option>
+                <option value="HLOSSsevere">Hearing Loss >> Severe Hearing Loss Compensation (⚠️high gains)</option>
+                <option value="HLOSSoriginal">Hearing Loss >> original / ClariQ Next 0.0.3 values</option>
+                <option value="GAMINGcompetitive">Gaming >> Competitive Gaming EQ (Footsteps & Tactical Audio)</option>
+                <option value="GAMINGimmersive">Gaming >> Immersive Gaming EQ (Cinematic Experience)</option>
+                <option value="GAMINGvoice">Gaming >> Voice Chat Gaming EQ (Clear Communication)</option>
+                <option value="GAMINGbalanced">Gaming >> Balanced Gaming EQ (All-Purpose)</option>
               </select>
-              <!--<input type="radio" id="radio_script_ahe_type" name="script_ahe_type" value="1">-->
             </div>
           </div>
 
@@ -281,9 +284,7 @@
             <button type="button" class="btn btn-primary btn-nav next-step">.ady file</button>
           </div>
         </div>
-        <!-- to browse to the Audyssey calibration file (.ady) generated by the MultEQ Editor (IOS/Android) app -->
 
-        <!-- Step 2: Professional Experience -->
         <!-- Step 2: Professional Experience -->
         <div class="form-step" data-step="2">
           <h3 class="mb-4">.ady file</h3>
@@ -1389,28 +1390,41 @@
           console.info(`  Subwoofer polarity inversion allowed: Yes.`);
         }
 
-        if (RP22DialogEnhancementFilter == true || RP22DialogEnhancementFilter == 1) {
-          console.warn(`  Advanced Dialog Enhancement Filters: ${RP22DialogEnhancementFilter}`);
+        if (AdvancedFilters == true || AdvancedFilters == 1) {
+          console.warn(`  Advanced Filters: ${AdvancedFilters}`);
         } else {
-          console.info(`  Advanced Dialog Enhancement Filters: ${RP22DialogEnhancementFilter}`);
+          console.info(`  Advanced Filters: ${AdvancedFilters}`);
         }
 
-        if (AdvancedHearinglossFilter == true || AdvancedHearinglossFilter == 1) {
-          console.warn(`  Advanced Hearing Loss Enhancement Filters: ${AdvancedHearinglossFilter}`);
-        } else {
-          console.info(`  Advanced Hearing Loss Enhancement Filters: ${AdvancedHearinglossFilter}`);
-        }
+        if (AdvancedFilters == true && AdvancedFiltersType == "null") {
+          console.info(`  Advanced Filters Type: none`);
 
-        if (hearingLossType == "null") {
-          console.info(`  Advanced Hearing Loss Enhancement Type: ${hearingLossType}`);
-        } else if (hearingLossType == "research") {
-          console.warn(`  Advanced Hearing Loss Enhancement Type: ${hearingLossType}`);
-        } else if (hearingLossType == "moderate") {
-          console.warn(`  Advanced Hearing Loss Enhancement Type: ${hearingLossType}`);
-        } else if (hearingLossType == "severe") {
-          console.warn(`  Advanced Hearing Loss Enhancement Type: ${hearingLossType}`);
-        } else if (hearingLossType == "original") {
-          console.warn(`  Advanced Hearing Loss Enhancement Type: ${hearingLossType}`);
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "DIALOGadvanced") {
+          console.warn(`  Advanced Filters Type: Advanced Dialog Enhancement CEDIA RP22`);
+
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "HLOSSresearch") {
+          console.warn(`  Advanced Filters Type: Research-Based Hearing Loss Compensation`);
+
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "HLOSSmoderate") {
+          console.warn(`  Advanced Filters Type: Moderate Hearing Loss Compensation`);
+
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "HLOSSsevere") {
+          console.warn(`  Advanced Filters Type: Severe Hearing Loss Compensation`);
+
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "HLOSSoriginal") {
+          console.warn(`  Advanced Filters Type: Original 0.0.3 Hearing Loss Compensation`);
+
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "GAMINGcompetitive") {
+          console.warn(`  Advanced Filters Type: Competitive Gaming EQ (Footsteps & Tactical Audio)`);
+
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "GAMINGimmersive") {
+          console.warn(`  Advanced Filters Type: Immersive Gaming EQ (Cinematic Experience)`);
+
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "GAMINGvoice") {
+          console.warn(`  Advanced Filters Type: Voice Chat Gaming EQ (Clear Communication)`);
+
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "GAMINGbalanced") {
+          console.infwarno(`  Advanced Filters Type: Balanced Gaming EQ (All-Purpose)`);
         }
 
         if (needsSorting) {
@@ -1958,8 +1972,20 @@
       async function generateFilters() {
         console.log(`Generating min. phase EQ filters...`);
 
-        // Hearing loss compensation type: "research", "moderate", "severe", "original", or null
+        // ===== FILTER CONFIGURATION =====
+        // Set these variables to enable different filter types:
+
+        // Hearing loss compensation: "research", "moderate", "severe", "original", or null
         // const hearingLossType = "research";
+
+        // Gaming EQ optimization: "competitive", "immersive", "voice", "balanced", or null  
+        // - "competitive": Optimized for footsteps, gunshots, tactical audio (FPS games)
+        // - "immersive": Cinematic experience with enhanced atmosphere (RPG/Adventure) 
+        // - "voice": Clear voice chat communication with game audio
+        // - "balanced": All-purpose gaming enhancement
+        // const gamingEQType = "competitive";
+
+        // Dialog enhancement: controlled by existing RP22DialogEnhancementFilter boolean
 
         // Smart filter creation helper - handles REW API parameter requirements
         const createREWFilter = (index, type, frequency, gaindB = 0, q = 1.0) => ({
@@ -1972,10 +1998,29 @@
           ...(type === "PK" && { q })        // Only PK filters have q
         });
 
-        // Hearing loss filter definitions
-        const getHearingLossFilters = (type) => {
+        const getAdvancedFilters = (type) => {
           switch (type) {
-            case "research":
+            case "DIALOGadvanced":
+              return {
+                filters: [
+                  createREWFilter(16, "PK", 1600, 2.5, 1.2),   // Peak speech intelligibility
+                  createREWFilter(17, "PK", 3000, 3.0, 1.5),   // Critical consonant clarity
+                  createREWFilter(18, "PK", 800, 1.5, 0.8),    // Speech warmth and body
+                  createREWFilter(19, "PK", 4500, 2.0, 1.8),   // Upper consonant definition
+                  createREWFilter(20, "HS", 5000, -1.0)        // Sibilance control
+                ],
+                description: "Advanced Dialog Enhancement CEDIA RP22",
+                targets: [
+                  "- 800Hz: +1.5dB (Speech warmth and body)",
+                  "- 1.6kHz: +2.5dB (Peak speech intelligibility",
+                  "- 3kHz: +3.0dB (Critical consonant clarity)",
+                  "- 4.5kHz: +2.0dB (Upper consonant definition)",
+                  "- 5kHz+: -1.0dB (Sibilance control)"
+                ]
+              };
+
+
+            case "HLOSSresearch":
               return {
                 filters: [
                   createREWFilter(11, "PK", 2000, 2.0, 1.0),   // Presbycusis difficulty onset
@@ -1992,7 +2037,7 @@
                 ]
               };
 
-            case "moderate":
+            case "HLOSSmoderate":
               return {
                 filters: [
                   createREWFilter(11, "HP", 80),                // Remove low-frequency masking
@@ -2009,10 +2054,10 @@
                 ]
               };
 
-            case "severe":
+            case "HLOSSsevere":
               return {
                 filters: [
-                  createREWFilter(11, "HP", 100),               // Aggressive low-cut
+                  createREWFilter(11, "HP", 100),              // Aggressive low-cut
                   createREWFilter(12, "PK", 2000, 6.0, 1.0),   // Strong speech boost
                   createREWFilter(13, "PK", 4000, 10.0, 1.5),  // Maximum 4kHz compensation
                   createREWFilter(14, "PK", 6000, 12.0, 1.5),  // Strong 6kHz boost
@@ -2028,7 +2073,7 @@
                 ]
               };
 
-            case "original":
+            case "HLOSSoriginal":
               return {
                 filters: [
                   createREWFilter(11, "PK", 1000, 1.5, 0.9),   // Speech body and presence
@@ -2037,13 +2082,97 @@
                   createREWFilter(14, "PK", 6000, 3.0, 1.8),   // Upper speech and sibilant detail
                   createREWFilter(15, "HS", 8000, 2.0)         // High frequency audibility
                 ],
-                description: "Original Hearing Loss Compensation",
+                description: "Original 0.0.3 Hearing Loss Compensation",
                 targets: [
                   "- 1kHz: +1.5dB (Speech body and presence)",
                   "- 2.5kHz: +3.0dB (Consonant intelligibility)",
                   "- 4kHz: +4.0dB (High consonant clarity boost)",
                   "- 6kHz: +3.0dB (Upper speech and sibilant detail)",
                   "- 8kHz+: +2.0dB (High frequency audibility)"
+                ]
+              };
+
+            case "GAMINGcompetitive":
+              return {
+                filters: [
+                  // createREWFilter(5, "HP", 60),            // Remove low-frequency rumble
+                  createREWFilter(6, "PK", 400, -2.0, 1.0),   // Reduce muddiness that masks footsteps
+                  createREWFilter(7, "PK", 2000, 3.0, 1.2),   // Boost footstep frequency range
+                  createREWFilter(8, "PK", 4000, 4.0, 1.5),   // Critical footstep/gunshot clarity
+                  createREWFilter(9, "PK", 8000, 3.0, 1.8),   // High-frequency tactical sounds
+                  createREWFilter(10, "HS", 10000, 2.0)       // Enhance detail/positioning cues
+                ],
+                description: "Competitive Gaming EQ (Footsteps & Tactical Audio)",
+                targets: [
+                  // "- 60Hz: High-pass (remove rumble that masks footsteps)",
+                  "- 400Hz: -2.0dB (reduce muddiness)",
+                  "- 2kHz: +3.0dB (footstep detection range)",
+                  "- 4kHz: +4.0dB (critical footsteps & gunshots)",
+                  "- 8kHz: +3.0dB (tactical audio positioning)",
+                  "- 10kHz+: +2.0dB (detail & directional cues)"
+                ]
+              };
+
+            case "GAMINGimmersive":
+              return {
+                filters: [
+                  createREWFilter(5, "PK", 80, 2.0, 0.8),     // Enhanced bass for explosions/atmosphere
+                  createREWFilter(6, "PK", 200, 3.0, 1.0),    // Low-mid warmth and impact
+                  createREWFilter(7, "PK", 1000, 1.0, 0.9),   // Balanced mid-range
+                  createREWFilter(8, "PK", 3000, 2.0, 1.2),   // Speech and effects clarity
+                  createREWFilter(9, "PK", 6000, 1.5, 1.5),   // Detail without harshness
+                  createREWFilter(10, "HS", 8000, 1.0)        // Subtle air and openness
+                ],
+                description: "Immersive Gaming EQ (Cinematic Experience)",
+                targets: [
+                  "- 80Hz: +2.0dB (bass impact for explosions)",
+                  "- 200Hz: +3.0dB (warmth and atmosphere)",
+                  "- 1kHz: +1.0dB (balanced mid-range)",
+                  "- 3kHz: +2.0dB (speech and effects clarity)",
+                  "- 6kHz: +1.5dB (detail without fatigue)",
+                  "- 8kHz+: +1.0dB (subtle air and space)"
+                ]
+              };
+
+            case "GAMINGvoice":
+              return {
+                filters: [
+                  // createREWFilter(5, "HP", 100),           // Remove low-frequency noise
+                  createREWFilter(6, "PK", 300, -1.0, 1.0),   // Reduce boom in voice
+                  createREWFilter(7, "PK", 1500, 3.0, 1.0),   // Core voice intelligibility
+                  createREWFilter(8, "PK", 3000, 4.0, 1.5),   // Voice clarity and consonants
+                  createREWFilter(9, "PK", 5000, 2.0, 2.0),   // Voice presence without sibilance
+                  createREWFilter(10, "HS", 8000, -1.0)       // Reduce harshness
+                ],
+                description: "Voice Chat Gaming EQ (Clear Communication)",
+                targets: [
+                  // "- 100Hz: High-pass (remove voice noise)",
+                  "- 300Hz: -1.0dB (reduce voice boom)",
+                  "- 1.5kHz: +3.0dB (core voice intelligibility)",
+                  "- 3kHz: +4.0dB (voice clarity & consonants)",
+                  "- 5kHz: +2.0dB (presence without sibilance)",
+                  "- 8kHz+: -1.0dB (reduce harshness)"
+                ]
+              };
+
+            case "GAMINGbalanced":
+              return {
+                filters: [
+                  // createREWFilter(5, "HP", 40),            // Gentle low-cut
+                  createREWFilter(6, "PK", 150, 1.0, 0.8),    // Subtle bass enhancement
+                  createREWFilter(7, "PK", 1000, 1.5, 1.0),   // Mid-range presence
+                  createREWFilter(8, "PK", 3000, 2.0, 1.3),   // Speech/effects balance
+                  createREWFilter(9, "PK", 6000, 1.5, 1.5),   // Detail and clarity
+                  createREWFilter(10, "HS", 10000, 1.0)       // Subtle high-end extension
+                ],
+                description: "Balanced Gaming EQ (All-Purpose)",
+                targets: [
+                  // "- 40Hz: High-pass (gentle low-cut)",
+                  "- 150Hz: +1.0dB (subtle bass enhancement)",
+                  "- 1kHz: +1.5dB (mid-range presence)",
+                  "- 3kHz: +2.0dB (speech & effects balance)",
+                  "- 6kHz: +1.5dB (detail and clarity)",
+                  "- 10kHz+: +1.0dB (subtle high-end)"
                 ]
               };
 
@@ -2093,60 +2222,56 @@
             console.debug(`${commandId[i]} could not be equalized!`);
           }
 
-          // Apply Hearing Loss Compensation (if enabled and not subwoofer)
-          if (hearingLossType && AdvancedHearinglossFilter && commandId[i] !== "SW" && commandId[i] !== "SW1" && commandId[i] !== "SWMIX") {
-            const hearingLossConfig = getHearingLossFilters(hearingLossType);
+          // Apply Advanced Filters (if enabled, has a type other than null and is not subwoofer) 
+          if (AdvancedFilters && AdvancedFiltersType !== "null" && commandId[i] !== "SW" && commandId[i] !== "SW1" && commandId[i] !== "SWMIX") {
 
-            if (hearingLossConfig) {
-              console.log(`APPLYING ${hearingLossConfig.description} to:`, commandId[i]);
-              console.info("Enhancement targets:");
+            // For DIALOGadvanced, ONLY apply to center channel
+            if (AdvancedFiltersType === "DIALOGadvanced") {
+              if (commandId[i] === "C") {
+                // Apply DIALOGadvanced filter to center channel
+                const AdvanedFiltersConfig = getAdvancedFilters(AdvancedFiltersType);
 
-              // Apply filters sequentially with delays
-              for (let j = 0; j < hearingLossConfig.filters.length; j++) {
-                await postSafe(`${baseUrl}/${i}/filters`, {
-                  filters: [hearingLossConfig.filters[j]]
-                }, "Filters set");
-                await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+                if (AdvanedFiltersConfig) {
+                  console.log(`APPLYING ${AdvanedFiltersConfig.description} to:`, commandId[i]);
+                  console.info("Gaming optimization targets:");
+
+                  // Apply filters sequentially with delays
+                  for (let j = 0; j < AdvanedFiltersConfig.filters.length; j++) {
+                    await postSafe(`${baseUrl}/${i}/filters`, {
+                      filters: [AdvanedFiltersConfig.filters[j]]
+                    }, "Filters set");
+                    await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+                  }
+
+                  // Log all targets
+                  AdvanedFiltersConfig.targets.forEach(target => console.info(target));
+
+                  console.log(`${AdvanedFiltersConfig.description} applied successfully`);
+                }
               }
+              // If not center channel, do nothing (skip)
+            } else {
+              // For all other filter types, apply to all non-subwoofer channels
+              const AdvanedFiltersConfig = getAdvancedFilters(AdvancedFiltersType);
 
-              // Log all targets
-              hearingLossConfig.targets.forEach(target => console.info(target));
+              if (AdvanedFiltersConfig) {
+                console.log(`APPLYING ${AdvanedFiltersConfig.description} to:`, commandId[i]);
+                console.info("Gaming optimization targets:");
 
-              if (hearingLossType === "severe") {
-                console.log("⚠️  High gain levels applied - monitor for feedback/distortion");
+                // Apply filters sequentially with delays
+                for (let j = 0; j < AdvanedFiltersConfig.filters.length; j++) {
+                  await postSafe(`${baseUrl}/${i}/filters`, {
+                    filters: [AdvanedFiltersConfig.filters[j]]
+                  }, "Filters set");
+                  await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+                }
+
+                // Log all targets
+                AdvanedFiltersConfig.targets.forEach(target => console.info(target));
+
+                console.log(`${AdvanedFiltersConfig.description} applied successfully`);
               }
-
-              console.log(`${hearingLossConfig.description} applied successfully`);
             }
-          }
-
-          // Apply CEDIA RP22 Dialog Enhancement
-          if (commandId[i] === "C" && RP22DialogEnhancementFilter) {
-            console.log(`APPLYING CEDIA RP22 Dialog Enhancement Filters to:`, commandId[i]);
-            console.info("Enhancement targets:");
-
-            const dialogFilters = [
-              createREWFilter(16, "PK", 1600, 2.5, 1.2),   // Peak speech intelligibility
-              createREWFilter(17, "PK", 3000, 3.0, 1.5),   // Critical consonant clarity
-              createREWFilter(18, "PK", 800, 1.5, 0.8),    // Speech warmth and body
-              createREWFilter(19, "PK", 4500, 2.0, 1.8),   // Upper consonant definition
-              createREWFilter(20, "HS", 5000, -1.0)        // Sibilance control
-            ];
-
-            // Apply filters sequentially with delays
-            for (let j = 0; j < dialogFilters.length; j++) {
-              await postSafe(`${baseUrl}/${i}/filters`, {
-                filters: [dialogFilters[j]]
-              }, "Filters set");
-              await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
-            }
-
-            console.info("- 800Hz: +1.5dB (Speech warmth and body)");
-            console.info("- 1.6kHz: +2.5dB (Peak speech intelligibility)");
-            console.info("- 3kHz: +3.0dB (Critical consonant clarity)");
-            console.info("- 4.5kHz: +2.0dB (Upper consonant definition)");
-            console.info("- 5kHz+: -1.0dB (Sibilance control)");
-            console.log("CEDIA RP22 Dialog Enhancement applied successfully");
           }
 
           // generate filters & auto level it
@@ -2519,16 +2644,16 @@
           customDistance[i] = 0;
         }
         if (noSub) { return; }
-
+  
         const flIndex = getFLIndex();
         let globalMinDist = Infinity;
-
+  
         // Check all main speakers
         for (let i = 1; i <= nSpeakers; i++) {
           const dist = flDist + (mSec[flIndex] - mSec[i]) * sOs;
           globalMinDist = Math.min(globalMinDist, dist);
         }
-
+  
         // Check subwoofers with their specific delay calculations
         if (bassMode === "Directional") {
           for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
@@ -2541,7 +2666,7 @@
           const distHiSub = distMainSub - subHiDelay * sOs;
           globalMinDist = Math.min(globalMinDist, distLoSub, distHiSub);
         }
-
+  
         // Apply single correction if needed
         if (globalMinDist < 0) {
           console.warn(`Distances are being shifted by ${Math.abs(globalMinDist).toFixed(2)}m to ensure all distances are positive!`);

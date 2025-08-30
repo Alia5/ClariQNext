@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.4 - 30-08-2025 @ 13:35
+// ClariQ Next 0.0.5 - 30-08-2025 @ 20:16
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -90,6 +90,14 @@ function getEmoji(lightModeEmoji, darkModeEmoji) {
 	return isDarkMode ? lightModeEmoji : darkModeEmoji;
 }
 
+// Cross-browser emoji handling for DYSLEXIC toggle
+function getDyslexicEmoji(regularEmoji, dyslexicEmoji) {
+	if (compat.isIE || compat.isTor) {
+		return isDyslexicMode ? "[BOOK]" : "[TEXT]";
+	}
+	return isDyslexicMode ? dyslexicEmoji : regularEmoji;
+}
+
 // Dark Mode Toggle Functionality (enhanced for cross-browser compatibility)
 function toggleTheme() {
 	isDarkMode = !isDarkMode; // Use existing global variable
@@ -124,6 +132,46 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (slider) slider.innerHTML = getEmoji("🌙", "🌙");
 		}
 		window.AppCalibration.cleanup.addEventListener(themeToggle, "click", toggleTheme);
+	}
+});
+
+// Global variable for dyslexic font state (add this with your other globals)
+// let isDyslexicMode = false;
+
+// Dyslexic Font Toggle Functionality
+function toggleDyslexicFont() {
+	isDyslexicMode = !isDyslexicMode;
+	const body = document.body;
+	const toggle = document.getElementById("dyslexicToggle");
+	const slider = toggle ? toggle.querySelector(".toggle-slider") : null;
+
+	if (isDyslexicMode) {
+		body.setAttribute("data-font", "dyslexic");
+		if (toggle) toggle.classList.add("active");
+		if (slider) slider.innerHTML = getEmoji("📖", "📖");
+	} else {
+		body.removeAttribute("data-font");
+		if (toggle) toggle.classList.remove("active");
+		if (slider) slider.innerHTML = getEmoji("🔤", "🔤");
+	}
+}
+
+// Initialize dyslexic font toggle
+document.addEventListener("DOMContentLoaded", function () {
+	const dyslexicToggle = document.getElementById("dyslexicToggle");
+	if (dyslexicToggle) {
+		// Update toggle to match current font state
+		const body = document.body;
+		const slider = dyslexicToggle.querySelector(".toggle-slider");
+
+		if (isDyslexicMode) {
+			dyslexicToggle.classList.add("active");
+			if (slider) slider.innerHTML = getDyslexicEmoji("🔤", "📖");
+		} else {
+			dyslexicToggle.classList.remove("active");
+			if (slider) slider.innerHTML = getDyslexicEmoji("🔤", "📖");
+		}
+		window.AppCalibration.cleanup.addEventListener(dyslexicToggle, "click", toggleDyslexicFont);
 	}
 });
 
@@ -483,14 +531,14 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (currentStep === 1) {
 			const cinema_type_radioButtons = currentStepElement.querySelectorAll('input[name="cinema_type"]');
 			const sub_inversion_radioButtons = currentStepElement.querySelectorAll('input[name="sub_inversion"]');
-			const ade_radioButtons = currentStepElement.querySelectorAll('input[name="script_ade"]');
-			const ahe_radioButtons = currentStepElement.querySelectorAll('input[name="script_ahe"]');
+			// const ade_radioButtons = currentStepElement.querySelectorAll('input[name="script_ade"]');
+			// const ahe_radioButtons = currentStepElement.querySelectorAll('input[name="script_ahe"]');
 			const is_cinema_type_Selected = Array.from(cinema_type_radioButtons).some((radio) => radio.checked);
 			const is_sub_inversion_Selected = Array.from(sub_inversion_radioButtons).some((radio) => radio.checked);
-			const is_ade_Selected = Array.from(ade_radioButtons).some((radio) => radio.checked);
-			const is_ahe_Selected = Array.from(ahe_radioButtons).some((radio) => radio.checked);
+			// const is_ade_Selected = Array.from(ade_radioButtons).some((radio) => radio.checked);
+			// const is_ahe_Selected = Array.from(ahe_radioButtons).some((radio) => radio.checked);
 			if (continueButton) {
-				continueButton.disabled = !(is_cinema_type_Selected && is_sub_inversion_Selected && is_ade_Selected && is_ahe_Selected);
+				continueButton.disabled = !((is_cinema_type_Selected && is_sub_inversion_Selected) /*&& is_ade_Selected && is_ahe_Selected*/);
 			}
 		} else if (currentStep === 2) {
 			const isFileUploaded = fileInput && fileInput.files.length > 0;
@@ -689,59 +737,63 @@ document.addEventListener("DOMContentLoaded", function () {
 	});
 
 	// CRITICAL: Keep original radio button handlers EXACTLY as they were
-	document.querySelectorAll('input[name="script_ade"]').forEach((radio) => {
+	document.querySelectorAll('input[name="script_af"]').forEach((radio) => {
 		window.AppCalibration.cleanup.addEventListener(radio, "change", (e) => {
 			if (e.target.value === "0") {
-				console.log("Advanced Dialog Enhancement OFF");
-				if (typeof RP22DialogEnhancementFilter !== "undefined") RP22DialogEnhancementFilter = false;
-				RP22DialogEnhancementFilter = false;
+				console.log("Advanced Filters OFF");
+				if (typeof AdvancedFilters !== "undefined") AdvancedFilters = false;
+				AdvancedFilters = false;
 			} else if (e.target.value === "1") {
-				console.warn("Advanced Dialog Enhancement ON");
-				if (typeof RP22DialogEnhancementFilter !== "undefined") RP22DialogEnhancementFilter = true;
-				RP22DialogEnhancementFilter = true;
+				console.warn("Advanced Filters ON");
+				if (typeof AdvancedFilters !== "undefined") AdvancedFilters = true;
+				AdvancedFilters = true;
 			}
 			updateContinueButtonState();
 		});
 	});
 
-	// CRITICAL: Keep original radio button handlers EXACTLY as they were
-	document.querySelectorAll('input[name="script_ahe"]').forEach((radio) => {
-		window.AppCalibration.cleanup.addEventListener(radio, "change", (e) => {
-			if (e.target.value === "0") {
-				console.log("Advanced Hearing Loss Enhancement OFF");
-				if (typeof AdvancedHearinglossFilter !== "undefined") AdvancedHearinglossFilter = false;
-				AdvancedHearinglossFilter = false;
-			} else if (e.target.value === "1") {
-				console.warn("Advanced Hearing Loss Enhancement ON");
-				if (typeof AdvancedHearinglossFilter !== "undefined") AdvancedHearinglossFilter = true;
-				AdvancedHearinglossFilter = true;
-			}
-			updateContinueButtonState();
-		});
-	});
-
-	document.querySelectorAll('select[name="script_ahe_type"]').forEach((select) => {
+	document.querySelectorAll('select[name="script_af_type"]').forEach((select) => {
 		window.AppCalibration.cleanup.addEventListener(select, "change", (e) => {
 			if (e.target.value == "null") {
-				console.info("Advanced Hearing Loss Enhancement Type: none");
+				console.info("Advanced Filter: none");
+				// "competitive", "immersive", "voice", "balanced", or null
+				AdvancedFiltersType = "null";
+			} else if (e.target.value == "DIALOGadvanced") {
+				console.warn("Advanced Dialog Enhancement CEDIA RP22");
 				// Hearing loss type: "research", "moderate", "severe", "original", or null
-				hearingLossType = "null";
-			} else if (e.target.value == "research") {
+				AdvancedFiltersType = "DIALOGadvanced";
+			} else if (e.target.value == "HLOSSresearch") {
 				console.warn("Advanced Hearing Loss Enhancement Type: research (presbycusis patterns)");
 				// Hearing loss type: "research", "moderate", "severe", "original", or null
-				hearingLossType = "research";
-			} else if (e.target.value == "moderate") {
+				AdvancedFiltersType = "HLOSSresearch";
+			} else if (e.target.value == "HLOSSmoderate") {
 				console.warn("Advanced Hearing Loss Enhancement Type: moderate (mild hearing loss)");
 				// Hearing loss type: "research", "moderate", "severe", "original", or null
-				hearingLossType = "moderate";
-			} else if (e.target.value == "severe") {
+				AdvancedFiltersType = "HLOSSmoderate";
+			} else if (e.target.value == "HLOSSsevere") {
 				console.warn("Advanced Hearing Loss Enhancement Type: severe (⚠️high gains)");
 				// Hearing loss type: "research", "moderate", "severe", "original", or null
-				hearingLossType = "severe";
-			} else if (e.target.value == "original") {
-				// Hearing loss type: "research", "moderate", "severe", "original", or null
-				hearingLossType = "original";
+				AdvancedFiltersType = "HLOSSsevere";
+			} else if (e.target.value == "HLOSSoriginal") {
 				console.warn("Advanced Hearing Loss Enhancement Type: original 0.0.3 values");
+				// Hearing loss type: "research", "moderate", "severe", "original", or null
+				AdvancedFiltersType = "HLOSSoriginal";
+			} else if (e.target.value == "GAMINGcompetitive") {
+				console.warn("Gaming EQ optimization Type: competitive / Optimized for footsteps, gunshots, tactical audio (FPS games)");
+				// "competitive", "immersive", "voice", "balanced", or null
+				AdvancedFiltersType = "GAMINGcompetitive";
+			} else if (e.target.value == "GAMINGimmersive") {
+				console.warn("Gaming EQ optimization Type: immersive / Cinematic experience with enhanced atmosphere (RPG/Adventure)");
+				// "competitive", "immersive", "voice", "balanced", or null
+				AdvancedFiltersType = "GAMINGimmersive";
+			} else if (e.target.value == "GAMINGvoice") {
+				console.warn("Gaming EQ optimization Type: voice / Clear voice chat communication with game audio");
+				// "competitive", "immersive", "voice", "balanced", or null
+				AdvancedFiltersType = "GAMINGvoice";
+			} else if (e.target.value == "GAMINGbalanced") {
+				console.warn("Gaming EQ optimization Type: balanced / All-purpose gaming enhancement");
+				// "competitive", "immersive", "voice", "balanced", or null
+				AdvancedFiltersType = "GAMINGbalanced";
 			}
 			updateContinueButtonState();
 		});
