@@ -1,4 +1,4 @@
-/* ClariQ Next 0.0.3 - 30-08-2025 @ 09:53 */
+/* ClariQ Next 0.0.4 - 30-08-2025 @ 13:35 */
 :root {
 	--primary-color: #2563eb;
 	--secondary-color: #3b82f6;
@@ -489,4 +489,13 @@ ul ul ul li {
 
 label {
 	font-size: 0.95rem;
+}
+
+.centerimg {
+	/*display: block;*/
+	margin-left: auto;
+	margin-right: auto;
+	width: 50%;
+	margin-bottom: 30px;
+	max-width: 64px;
 }

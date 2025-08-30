@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.3 - 30-08-2025 @ 09:53
+// ClariQ Next 0.0.4 - 30-08-2025 @ 13:35
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -670,39 +670,6 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (typeof isRP22mode !== "undefined") isRP22mode = true;
 				isRP22mode = true;
 			}
-
-			// CRITICAL: Keep original radio button handlers EXACTLY as they were
-			document.querySelectorAll('input[name="script_ade"]').forEach((radio) => {
-				window.AppCalibration.cleanup.addEventListener(radio, "change", (e) => {
-					if (e.target.value === "0") {
-						console.log("Advanced Dialog Enhancement OFF");
-						if (typeof RP22DialogEnhancementFilter !== "undefined") RP22DialogEnhancementFilter = false;
-						RP22DialogEnhancementFilter = false;
-					} else if (e.target.value === "1") {
-						console.warn("Advanced Dialog Enhancement ON");
-						if (typeof RP22DialogEnhancementFilter !== "undefined") RP22DialogEnhancementFilter = true;
-						RP22DialogEnhancementFilter = true;
-					}
-					updateContinueButtonState();
-				});
-			});
-
-			// CRITICAL: Keep original radio button handlers EXACTLY as they were
-			document.querySelectorAll('input[name="script_ahe"]').forEach((radio) => {
-				window.AppCalibration.cleanup.addEventListener(radio, "change", (e) => {
-					if (e.target.value === "0") {
-						console.log("Advanced Hearing Loss Enhancement OFF");
-						if (typeof AdvancedHearinglossFilter !== "undefined") AdvancedHearinglossFilter = false;
-						AdvancedHearinglossFilter = false;
-					} else if (e.target.value === "1") {
-						console.warn("Advanced Hearing Loss Enhancement ON");
-						if (typeof AdvancedHearinglossFilter !== "undefined") AdvancedHearinglossFilter = true;
-						AdvancedHearinglossFilter = true;
-					}
-					updateContinueButtonState();
-				});
-			});
-
 			const targetLevelDisplay = document.getElementById("target-level-display");
 			if (targetLevelDisplay && typeof targetLevel !== "undefined") {
 				targetLevelDisplay.textContent = `Offsetting all measurements to ${targetLevel}dB`;
@@ -717,6 +684,65 @@ document.addEventListener("DOMContentLoaded", function () {
 				}, 100);
 			}
 
+			updateContinueButtonState();
+		});
+	});
+
+	// CRITICAL: Keep original radio button handlers EXACTLY as they were
+	document.querySelectorAll('input[name="script_ade"]').forEach((radio) => {
+		window.AppCalibration.cleanup.addEventListener(radio, "change", (e) => {
+			if (e.target.value === "0") {
+				console.log("Advanced Dialog Enhancement OFF");
+				if (typeof RP22DialogEnhancementFilter !== "undefined") RP22DialogEnhancementFilter = false;
+				RP22DialogEnhancementFilter = false;
+			} else if (e.target.value === "1") {
+				console.warn("Advanced Dialog Enhancement ON");
+				if (typeof RP22DialogEnhancementFilter !== "undefined") RP22DialogEnhancementFilter = true;
+				RP22DialogEnhancementFilter = true;
+			}
+			updateContinueButtonState();
+		});
+	});
+
+	// CRITICAL: Keep original radio button handlers EXACTLY as they were
+	document.querySelectorAll('input[name="script_ahe"]').forEach((radio) => {
+		window.AppCalibration.cleanup.addEventListener(radio, "change", (e) => {
+			if (e.target.value === "0") {
+				console.log("Advanced Hearing Loss Enhancement OFF");
+				if (typeof AdvancedHearinglossFilter !== "undefined") AdvancedHearinglossFilter = false;
+				AdvancedHearinglossFilter = false;
+			} else if (e.target.value === "1") {
+				console.warn("Advanced Hearing Loss Enhancement ON");
+				if (typeof AdvancedHearinglossFilter !== "undefined") AdvancedHearinglossFilter = true;
+				AdvancedHearinglossFilter = true;
+			}
+			updateContinueButtonState();
+		});
+	});
+
+	document.querySelectorAll('select[name="script_ahe_type"]').forEach((select) => {
+		window.AppCalibration.cleanup.addEventListener(select, "change", (e) => {
+			if (e.target.value == "null") {
+				console.info("Advanced Hearing Loss Enhancement Type: none");
+				// Hearing loss type: "research", "moderate", "severe", "original", or null
+				hearingLossType = "null";
+			} else if (e.target.value == "research") {
+				console.warn("Advanced Hearing Loss Enhancement Type: research (presbycusis patterns)");
+				// Hearing loss type: "research", "moderate", "severe", "original", or null
+				hearingLossType = "research";
+			} else if (e.target.value == "moderate") {
+				console.warn("Advanced Hearing Loss Enhancement Type: moderate (mild hearing loss)");
+				// Hearing loss type: "research", "moderate", "severe", "original", or null
+				hearingLossType = "moderate";
+			} else if (e.target.value == "severe") {
+				console.warn("Advanced Hearing Loss Enhancement Type: severe (⚠️high gains)");
+				// Hearing loss type: "research", "moderate", "severe", "original", or null
+				hearingLossType = "severe";
+			} else if (e.target.value == "original") {
+				// Hearing loss type: "research", "moderate", "severe", "original", or null
+				hearingLossType = "original";
+				console.warn("Advanced Hearing Loss Enhancement Type: original 0.0.3 values");
+			}
 			updateContinueButtonState();
 		});
 	});
