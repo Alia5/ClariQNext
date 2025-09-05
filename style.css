@@ -1,4 +1,4 @@
-/* ClariQ Next 0.0.6 - 30-08-2025 @ 21:05 */
+/* ClariQ Next 0.0.7 - 05-09-2025 @ 14:58 */
 :root {
 	--primary-color: #2563eb;
 	--secondary-color: #3b82f6;
@@ -354,7 +354,8 @@ body {
 
 .slider-wrapper {
 	position: relative;
-	margin: 40px 0;
+	/*margin: 40px 0;*/
+	margin: 20px 0;
 }
 
 .slider-track {
@@ -439,7 +440,8 @@ body {
 
 .values-display {
 	text-align: center;
-	margin: 30px 0;
+	/*margin: 30px 0;*/
+	margin: 10px 0;
 	padding: 20px;
 	background: var(--border-color);
 	border-radius: 8px;
@@ -451,6 +453,9 @@ body {
 	margin: 10px 0;
 	font-size: 18px;
 	color: var(--text-color);
+	/* 0.0.7 */
+	display: inline-block;
+	margin: 0px 5px 0px 5px;
 }
 
 .min-value {
@@ -546,3 +551,8 @@ body[data-font="dyslexic"] span {
 	text-align: left; // Avoid justified text which can be harder for dyslexic readers //
 }
 */
+
+/* Load OpenDyslexic font from local files */
+.success {
+	color: #4caf50;
+}

@@ -16,7 +16,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.6 - 30-08-2025 @ 21:05";
+    const nextversion = "ClariQ Next 0.0.7 - 05-09-2025 @ 14:58";
+    // ClearCurve
+    let isClearCurve = false;
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
       "X8500H", "R-A110", "-S730H", "-S740H", "-S750H", "-S760H", "-S930H", "-S940H", "-S950H", "-S960H", "X1400H", "X1500H", "X1600H",
       "X1700H", "X2400H", "X2500H", "X2600H", "X2700H", "X3400H", "X3500H", "X3600H", "X3700H", "X4300H", "X4400H", "X4500H", "X4700H",
@@ -44,18 +46,25 @@
     const customLevel = [], customDistance = [], customCrossover = [];
     const mSec = [], invertSub = [], commandId = [];
     const m3dBPoints = {};
-    // const speedDelay = 256;
     let targetLevel = 75.0; // Audyssey typically calibrates to 75 dB SPL
-    let isCirrusLogictargetLevel = 78.0;
+    let isCirrusLogictargetLevel = 78.0; // -3db
     // Advanced sorting check and correction
     let needsSorting = false;
     let expectedOrder = [];
-    // Dark mode state
-    let isDarkMode = true;
+    // MODES
+    let isDarkMode = true; // start script in Darkmode 
+    let isDolbymode = false; // calibrationSPL: 82, peakSPL: 105, subPeakSPL: 115 
+    let isTHXmode = false; // calibrationSPL: 85, peakSPL: 105, subPeakSPL: 115
+    let isIMAXmode = false; // calibrationSPL: 100, peakSPL: 100, subPeakSPL: 115
+    let supportsIMAX = false; // explicit IMAX support variable
+    let modeSubXOMin = 31.5; // highest low of them all
+    let modeSubXOMax = 120; // highest high of them all
+    let modeSpkMin = 20; // lowest low.
+    let modeSpkMax = 20000; // highest high.
     // Dyslexic Mode
-    let isDyslexicMode = false;
+    let isDyslexicMode = false; // DyslexicMode off by default
     // cedia specific
-    let isRP22mode = false;
+    let isRP22mode = false; // calibrationSPL: 'performance-based', peakSPL: 105, subPeakSPL: 115
     let RP22subnminXO;
     let RP22submaxXO;
     let RP22subrequiredDelay;
@@ -68,11 +77,9 @@
     let estimatedDistances = [];
     // CREATE ARRAY TO STORE FINAL XO'S DISTANCES 
     let RP22BestXO = [];
-
     // CONDENCED VERSION
     let AdvancedFilters = false;
     let AdvancedFiltersType = "null";
-
     // SPEED DELAY BASED ON CPU CORES LIKE BEFORE
     // Add delay based on CPU cores ("logical")
     // Don't have to set speedDelay each time anymore!
@@ -104,9 +111,28 @@
       return delay;
     };
     let speedDelay = getOptimalDelay();
+    // store more AVR default values
+    let lfcSupport;
+    let enMultEQType;
+    let auro;
+    let dolbyVersion;
+    let dynamicEq;
+    let dynamicVolume;
+    let lfc;
+    let subwooferNum;
+    let subwooferLayout;
+    //
+    let hasHeightChannel = false;
+    const heightChannelIds = ["FHL", "RHL", "SHL", "TFL", "TML", "TRL", "BDL", "FDL", "SDL", "TS", "CH"];
+    let isDebugMode = false;
+    const delaymax = 1000.33;
+    let lowFreq, highFreq; // subwoofer values!
   </script>
   <!-- partial -->
   <script src="./script.js"></script>
+  <!-- Include jsPDF library first -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <!-- partial:index.partial.html -->
   <div class="container">
     <div class="form-container">
@@ -164,20 +190,6 @@
           <h3 class="mb-4">Basic settings</h3>
           <div class="mb-4">
             <ul>
-              <li>Measurement mode</li>
-              <ul>
-                <li>75dB home cinema / livingroom (small room acoustics)</li>
-                <li>85dB dedicated cinema / room (large room acoustics)</li>
-                <li>Cedia RP22 mode!</li>
-                <ul>
-                  <li>changes applied smoothing</li>
-                  <li>changes frequency ranges</li>
-                  <li>changes Crossover selection ranges</li>
-                  <li>aiming for full CEDIA RP22 coverage</li>
-                </ul>
-              </ul>
-            </ul>
-            <ul>
               <li>Sub inversion allowed</li>
               <ul>
                 <li>Can or are you willing to physically change subwoofer polarity?</li>
@@ -191,22 +203,8 @@
               </ul>
             </ul>
           </div>
-          <div class="row g-4">
-            <div class="col-md-4">
-              <label for="radio_home_cinema">Home Cinema (75dB)</label><br>
-              <input type="radio" id="radio_home_cinema" name="cinema_type" value="75" required checked="checked">
-            </div>
-            <div class="col-md-4">
-              <label for="radio_professional_cinema">Professional Cinema (85dB)</label><br>
-              <input type="radio" id="radio_professional_cinema" name="cinema_type" value="85">
-            </div>
-            <div class="col-md-4">
-              <label for="radio_professional_cinema">Cedia RP22 mode!</label><br>
-              <input type="radio" id="radio_cedia_cinema" name="cinema_type" value="85.1">
-            </div>
-          </div>
 
-          <br />
+          <hr />
           <div class="row g-4">
             <div class="col-md-4">
               <label for="radio_home_cinema">Sub inversion allowed</label><br>
@@ -218,7 +216,7 @@
             </div>
           </div>
 
-          <br />
+          <hr />
           <div class="row g-4">
             <div class="col-md-4">
               <label for="radio_script_mode_auto">Fully automatic</label><br>
@@ -230,7 +228,7 @@
             </div>
           </div>
 
-          <br />
+          <hr />
           <div class="row g-4">
             <h3 class="mb-4">Advanced Filters</h3>
             <div class="col-md-4">
@@ -287,16 +285,53 @@
 
         <!-- Step 2: Professional Experience -->
         <div class="form-step" data-step="2">
-          <h3 class="mb-4">.ady file</h3>
-          <div class="mb-4">
+          <div class="mb-4" id="BMs">
+            <h3 class="mb-4">Basic Measurement settings</h3>
+            <ul>
+              <li>Measurement mode</li>
+              <ul>
+                <li>Home Cinema (75dB -SPL) default</li>
+                <ul>
+                  <li>Subwoofer 30hz - 80Hz</li>
+                  <li>Speakers 20hz - 20kHz</li>
+                </ul>
+                <li>Dolby mode (82dB -SPL)</li>
+                <ul>
+                  <li>Subwoofer 31.5hz - 120Hz</li>
+                  <li>Speakers 40hz - 16kHz</li>
+                </ul>
+                <li>THX mode (85dB -SPL)</li>
+                <ul>
+                  <li>Subwoofer 20hz - 120Hz</li>
+                  <li>Speakers 80hz - 20kHz</li>
+                </ul>
+                <li>IMAX mode (100dB -SPL)</li>
+                <ul>
+                  <li>Subwoofer 20hz - 70Hz</li>
+                  <li>Speakers 70hz - 20kHz</li>
+                  <li>AVR specific!</li>
+                </ul>
+                <li>Cedia RP22 mode (85dB -SPL)</li>
+                <ul>
+                  <li>Subwoofer -hz - -Hz / performance based</li>
+                  <li>Speakers -hz - -Hz / performance based</li>
+                </ul>
+              </ul>
+            </ul>
+          </div>
+          <div class="mb-4" id="adyf">
+            <h3 class="mb-4">.ady file</h3>
             <ul>
               <li>upload your .ady file here</li>
               <ul>
-                <li>browse to the Audyssey calibration file (.ady) generated by the MultEQ Editor (IOS/Android) app</li>
-                <li>When prompted, download and 'save' the .zip (measurements) on your computer. Make sure the zip file
+                <li>browse to the Audyssey calibration file (.ady) generated by the MultEQ Editor (IOS/Android) app
+                </li>
+                <li>When prompted, download and 'save' the .zip (measurements) on your computer. Make sure the zip
+                  file
                   is unblocked: right-click > properties > unblock</li>
                 <li>Start REW, go to the 'EQ' / 'House Curve', and select a target curve of your choice</li>
-                <li>Open the zip file and select ALL (keyboard shortcut: "CTRL+A" for Windows / "Command+A" for Mac) the
+                <li>Open the zip file and select ALL (keyboard shortcut: "CTRL+A" for Windows / "Command+A" for Mac)
+                  the
                   files in that folder</li>
                 <li>Left click on the selection (inside the .zip file) and drag & drop them onto REW. Wait until all
                   measurements are imported
@@ -321,65 +356,127 @@
                   <li>* The final range used will depend on your suboofer(s) capabilities</li>
                 </ul>
               </ul>
-
             </ul>
-            <li><strong class="warning">Please keep REW on 'SPL & Phase' tab and stay on this web page until
-                optimization
-                is
-                completed!</strong></li>
-            </ul>
-            <br />
-            <label class="form-label" id="resumeUploadlabel" for="resumeUpload">.ady Upload</label>
-            <div class="file-upload" id="resumeUpload">
-              <input type="file" id="resume" class="d-none" accept=".ady">
-              <div class="upload-content">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor"
-                  class="bi bi-cloud-upload mb-3" viewBox="0 0 16 16">
-                  <path fill-rule="evenodd"
-                    d="M4.406 1.342A5.53 5.53 0 0 1 8 0c2.69 0 4.923 2 5.166 4.579C14.758 4.804 16 6.137 16 7.773 16 9.569 14.502 11 12.687 11H10a.5.5 0 0 1 0-1h2.688C13.979 10 15 8.988 15 7.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 2.825 10.328 1 8 1a4.53 4.53 0 0 0-2.941 1.1c-.757.652-1.153 1.438-1.153 2.055v.448l-.445.049C2.064 4.805 1 5.952 1 7.318 1 8.785 2.23 10 3.781 10H6a.5.5 0 0 1 0 1H3.781C1.708 11 0 9.366 0 7.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z" />
-                  <path fill-rule="evenodd"
-                    d="M7.646 4.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V14.5a.5.5 0 0 1-1 0V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3z" />
-                </svg>
-                <p class="mb-1">Drag and drop your ADY here</p>
-                <p class="text-muted small">or click to browse (ADY)</p>
-              </div>
-            </div>
-
-            <!-- Slider container - initially hidden, will be shown after .ady processing -->
-            <div class="slider-container" style="display: none;">
-              <h3 class="mb-4">Frequency Range Selector</h3>
-              <ul>
-                <li>Select a "preferred range" from the frequency index values</li>
-                <ul>
-                  <li>The final range used will depend on your suboofer(s) capabilities</li>
-                  <li>We don't know your suboofer(s) capabilities at this stage.</li>
-                </ul>
-              </ul>
-              <div class="values-display">
-                <div class="value-item">
-                  Min: <span class="min-value" id="minValue"></span>
-                </div>
-                <div class="value-item">
-                  Max: <span class="max-value" id="maxValue"></span>
-                </div>
-                <div class="range-info">
-                  Range: <span id="rangeValue"></span> |
-                  Indices: <span id="indicesValue"></span>
-                </div>
-              </div>
-
-              <div class="slider-wrapper">
-                <div class="slider-track">
-                  <div class="slider-range" id="sliderRange"></div>
-                </div>
-                <div class="slider-handle min" id="minHandle"></div>
-                <div class="slider-handle max" id="maxHandle"></div>
-
-                <div class="slider-ticks" id="sliderTicks"></div>
-              </div>
-            </div>
-
           </div>
+          <hr />
+          <div class="row g-4">
+            <strong class="error" id="unlock_cinema_modes">Please upload your .ady and import your measurements into
+              REW</strong>
+            <div class="col-md-4">
+              <label for="radio_home_cinema">Home Cinema (75dB)</label><br>
+              <input type="radio" id="radio_home_cinema" name="cinema_type" value="75" required checked="checked"
+                disabled>
+            </div>
+            <div class="col-md-4">
+              <label for="radio_professional_cinema">Dolby mode!</label><br>
+              <input type="radio" id="radio_dolby_cinema" name="cinema_type" value="85.2" disabled>
+            </div>
+            <div class="col-md-4">
+              <label for="radio_professional_cinema">Cedia RP22 mode!</label><br>
+              <input type="radio" id="radio_cedia_cinema" name="cinema_type" value="85.1" disabled>
+            </div>
+            <div class="col-md-4">
+              <label for="radio_professional_cinema">THX mode!</label><br>
+              <input type="radio" id="radio_thx_cinema" name="cinema_type" value="85.3" disabled>
+            </div>
+            <div class="col-md-4">
+              <label for="radio_professional_cinema">IMAX mode!</label><br>
+              <input type="radio" id="radio_imax_cinema" name="cinema_type" value="85.4" disabled>
+            </div>
+          </div>
+
+          <hr />
+          <li><strong class="warning">Please keep REW on 'SPL & Phase' tab and stay on this web page until
+              optimization
+              is
+              completed!</strong></li>
+          </ul>
+          <br />
+          <label class="form-label" id="resumeUploadlabel" for="resumeUpload">.ady Upload</label>
+          <div class="file-upload" id="resumeUpload">
+            <input type="file" id="resume" class="d-none" accept=".ady">
+            <div class="upload-content">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor"
+                class="bi bi-cloud-upload mb-3" viewBox="0 0 16 16">
+                <path fill-rule="evenodd"
+                  d="M4.406 1.342A5.53 5.53 0 0 1 8 0c2.69 0 4.923 2 5.166 4.579C14.758 4.804 16 6.137 16 7.773 16 9.569 14.502 11 12.687 11H10a.5.5 0 0 1 0-1h2.688C13.979 10 15 8.988 15 7.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 2.825 10.328 1 8 1a4.53 4.53 0 0 0-2.941 1.1c-.757.652-1.153 1.438-1.153 2.055v.448l-.445.049C2.064 4.805 1 5.952 1 7.318 1 8.785 2.23 10 3.781 10H6a.5.5 0 0 1 0 1H3.781C1.708 11 0 9.366 0 7.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z" />
+                <path fill-rule="evenodd"
+                  d="M7.646 4.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V14.5a.5.5 0 0 1-1 0V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3z" />
+              </svg>
+              <p class="mb-1">Drag and drop your ADY here</p>
+              <p class="text-muted small">or click to browse (ADY)</p>
+            </div>
+          </div>
+
+          <!-- BED LAYER Slider container - initially hidden, will be shown after .ady processing -->
+          <div class="slider-container bed-layer" style="display: none;">
+            <h4 class="mb-4">Frequency Range Selector - BED LAYER</h4>
+            <ul>
+              <li>Select a "preferred range" from the frequency index values</li>
+              <ul>
+                <li>The final range used will depend on your subwoofer(s) capabilities</li>
+                <li>We don't know your subwoofer(s) capabilities at this stage.</li>
+              </ul>
+            </ul>
+            <div class="values-display">
+              <div class="value-item">
+                Min: <span class="min-value" id="minValue-bed"></span>
+              </div>
+              <div class="value-item">
+                Max: <span class="max-value" id="maxValue-bed"></span>
+              </div>
+              <div class="range-info">
+                Range: <span id="rangeValue-bed"></span> |
+                Indices: <span id="indicesValue-bed"></span>
+              </div>
+            </div>
+
+            <div class="slider-wrapper">
+              <div class="slider-track">
+                <div class="slider-range" id="sliderRange-bed"></div>
+              </div>
+              <div class="slider-handle min" id="minHandle-bed"></div>
+              <div class="slider-handle max" id="maxHandle-bed"></div>
+
+              <div class="slider-ticks" id="sliderTicks-bed"></div>
+            </div>
+          </div>
+
+          <!-- HEIGHT LAYER Slider container - initially hidden, will be shown after .ady processing -->
+          <div class="slider-container height-layer" style="display: none;">
+            <h4 class="mb-4">Frequency Range Selector - HEIGHT LAYER</h4>
+            <ul>
+              <li>Select a "preferred range" from the frequency index values</li>
+              <ul>
+                <li>The final range used will depend on your subwoofer(s) capabilities</li>
+                <li>We don't know your subwoofer(s) capabilities at this stage.</li>
+              </ul>
+            </ul>
+            <div class="values-display">
+              <div class="value-item">
+                Min: <span class="min-value" id="minValue-height"></span>
+              </div>
+              <div class="value-item">
+                Max: <span class="max-value" id="maxValue-height"></span>
+              </div>
+              <div class="range-info">
+                Range: <span id="rangeValue-height"></span> |
+                Indices: <span id="indicesValue-height"></span>
+              </div>
+            </div>
+
+            <div class="slider-wrapper">
+              <div class="slider-track">
+                <div class="slider-range" id="sliderRange-height"></div>
+              </div>
+              <div class="slider-handle min" id="minHandle-height"></div>
+              <div class="slider-handle max" id="maxHandle-height"></div>
+
+              <div class="slider-ticks" id="sliderTicks-height"></div>
+            </div>
+          </div>
+
+
           <div class="d-flex justify-content-between mt-4">
             <button type="button" class="btn btn-secondary btn-nav prev-step">← Back</button>
             <button type="button" class="btn btn-primary btn-nav next-step">SPL Adjustments →</button>
@@ -599,10 +696,7 @@
           <div class="mb-4">
             <ul>
               <li>Constructing .ady files</li>
-              <ul>
-                <li>including ClariQ next: ISO 226 Acoustics — Normal equal-loudnesslevel contours</li>
-                <li>applied to .ady generation</li>
-              </ul>
+              <li>generating final trims for .ady file</li>
               <li>Generating CEDIA RP22 report</li>
             </ul>
           </div>
@@ -619,7 +713,6 @@
       <br />
       <div class="row g-4">
         <div class="col-md-4" style="text-align: center;">
-          <!--<img src="https://www.nvexx.nl/audyssey/nvexx_128.png" class="centerimg" alt="Nvexx logo" />-->
           <p>Socials:</p>
           <a href="https://ko-fi.com/nvexx" target="_blank" style="text-decoration: none;">Ko-fi <span
               class="icon-cup"></span></a>
@@ -649,17 +742,6 @@
           <p style="color: #1db954; ">skull's Audio System Test Tracks</p>
         </div>
       </div>
-
-    </div>
-
-    <div id="mySidenav" class="sidenav">
-
-
-
-
-      <div style="top: 10%; position: relative;">
-        <a id="version-number" class="version-number"></a>
-      </div>
     </div>
 
     <script>
@@ -683,6 +765,7 @@
           }
           if (models70xo.includes(model)) {
             freqIndex.push(70);
+            supportsIMAX = true;
           }
           freqIndex.sort(function (a, b) { return a - b; });
           Object.freeze(freqIndex);
@@ -695,6 +778,28 @@
           Object.freeze(noSub);
           bassMode = jsonData.subwooferMode;
           Object.freeze(bassMode);
+          //
+          lfcSupport = jsonData.lfcSupport;
+          Object.freeze(lfcSupport);
+          enMultEQType = jsonData.enMultEQType;
+          Object.freeze(enMultEQType);
+          auro = jsonData.auro;
+          Object.freeze(auro);
+          dolbyVersion = jsonData.dolbyVersion;
+          Object.freeze(dolbyVersion);
+          dynamicEq = jsonData.dynamicEq;
+          Object.freeze(dynamicEq);
+          dynamicVolume = jsonData.dynamicVolume;
+          Object.freeze(dynamicVolume);
+          lfc = jsonData.lfc;
+          Object.freeze(lfc);
+          subwooferMode = jsonData.subwooferMode;
+          Object.freeze(subwooferMode);
+          subwooferNum = jsonData.subwooferNum;
+          Object.freeze(subwooferNum);
+          subwooferLayout = jsonData.subwooferLayout;
+          Object.freeze(subwooferLayout);
+          //
           noCenter = true;
           subLoTrim = Infinity;
           subHiTrim = -Infinity;
@@ -732,6 +837,11 @@
               channel.frequencyRangeRolloff = 20000;
             }
 
+
+            if (channel.commandId && heightChannelIds.includes(channel.commandId)) {
+              hasHeightChannel = true;
+            }
+
             console.info("Channel", channel.commandId);
             console.info("customEnSpeakerConnect", channel.channelReport.customEnSpeakerConnect);
             console.info("distance", channel.channelReport.distance);
@@ -747,12 +857,7 @@
             console.info("isSkipMeasurement", channel.isSkipMeasurement);
             console.info("midrangeCompensation", channel.midrangeCompensation);
             console.info("trimAdjustment", channel.trimAdjustment);
-            // console.info("Is subwoofer", isSubwoofer);
-            // console.info("Is First Subfoower", isFirstSubwoofer);
-            // console.info("NvexxIsSubwoofer", NvexxIsSubwoofer);
             console.info("");
-
-
           });
           Object.freeze(noCenter);
           Object.freeze(swChannelCount);
@@ -816,7 +921,7 @@
               // Extract expected measurement names from ADY
               jsonData.detectedChannels.forEach(channel => {
                 const commandId = channel.commandId;  // e.g., "FL"
-                const indices = Object.keys(channel.responseData); // e.g., ["0", "1", "2"]
+                const expectedMeasurements = Object.keys(channel.responseData); // e.g., ["0", "1", "2"]
 
                 // Generate expected REW names: FL0, FL1, FL2
                 indices.forEach(index => {
@@ -896,18 +1001,12 @@
         reader.readAsText(file);
       }
 
+      // Not needed... Find solution later
       function SetTargetlevel() {
-        // clearCommands();
-        // await new Promise((resolve) => setTimeout(resolve, speedDelay));
-        // disableBlock();
-        // await new Promise((resolve) => setTimeout(resolve, speedDelay));
-        // enableBlock();
-        // enableGraph();
-        // await new Promise((resolve) => setTimeout(resolve, speedDelay));
         const selectedRadio = document.querySelector('input[name="cinema_type"]:checked');
-        // targetLevel = parseInt(selectedRadio.value); // Will be 75 or 85 based on selection
       }
 
+      // Not needed... Find solution later
       function SetnoInversion() {
         const selectedRadio = document.querySelector('input[name="sub_inversion"]:checked');
         if (selectedRadio.value === "1") {
@@ -917,8 +1016,7 @@
         }
       }
 
-      // CorrectSPL Offsets in REW!
-      // RUNS AT STEP 3
+      // CorrectSPL Offsets in REW! > RUNS AT STEP 3
       async function CorrectSPL() {
         clearCommands();
         await new Promise((resolve) => setTimeout(resolve, speedDelay));
@@ -945,48 +1043,57 @@
           console.log(`Found ${mCount} measurements to correct`);
 
           // BEFORE addmicCal
-          if (parseFloat(measurements[1].splOffsetdB) == 78.0 || parseFloat(measurements[1].splOffsetdB) == 78) {
+          if (parseFloat(measurements[1].splOffsetdB) == 78) {
             // console.warn("Measurements are NOT made with AUDYSSEY APP!", parseFloat(measurements[1].splOffsetdB));
             console.warn("Measurements at 78.0dB MJC");
             if (targetLevel == 75) {
               if (isCirrusLogic) {
-                isCirrusLogictargetLevel = 78.0;
+                isCirrusLogictargetLevel = 75.0;
               } else {
                 isCirrusLogictargetLevel = 75.0;
               }
             } else {
               if (isCirrusLogic) {
-                isCirrusLogictargetLevel = 88.0;
+                isCirrusLogictargetLevel = 75.0;
               } else {
-                isCirrusLogictargetLevel = 85.0;
+                isCirrusLogictargetLevel = 75.0;
               }
             }
-          } else if (parseFloat(measurements[1].splOffsetdB) == 88.0 || parseFloat(measurements[1].splOffsetdB) == 88) {
+          } else if (parseFloat(measurements[1].splOffsetdB) == 88) {
             console.warn("Measurements at 88.0dB");
             if (targetLevel == 75) {
               if (isCirrusLogic) {
-                isCirrusLogictargetLevel = 78.0;
+                isCirrusLogictargetLevel = 75.0;
               } else {
                 isCirrusLogictargetLevel = 75.0;
               }
             } else {
               if (isCirrusLogic) {
-                isCirrusLogictargetLevel = 88.0;
+                isCirrusLogictargetLevel = 85.0;
               } else {
                 isCirrusLogictargetLevel = 85.0;
               }
             }
-          } else if (parseFloat(measurements[1].splOffsetdB) == 120 || parseFloat(measurements[1].splOffsetdB) == 88) {
-            console.warn("Measurements at 120.0dB old MJ");
+          } else if (parseFloat(measurements[1].splOffsetdB) == 120) {
+            isAutoMode = false;
+            isScriptRunning = false;
+            console.warn("Measurements at 120.0dB old MJ !");
+            console.error("120dB measurements (old MJ) are no longer supported!");
+            console.error("Please use the ZIP that came with ClariQ Next");
+            console.error("Or use custom measurements inside REW");
+            console.warn("Measurements at 120.0dB old MJ !");
+            throw new Error("Unsupported measurement type: 120dB old MJ format is deprecated");
+            // process.exit(1); // Forceful exit - can't be caught
+            // return; // Exit the current function
             if (targetLevel == 75) {
               if (isCirrusLogic) {
-                isCirrusLogictargetLevel = 78.0;
+                isCirrusLogictargetLevel = 75.0;
               } else {
                 isCirrusLogictargetLevel = 75.0;
               }
             } else {
               if (isCirrusLogic) {
-                isCirrusLogictargetLevel = 88.0;
+                isCirrusLogictargetLevel = 85.0;
               } else {
                 isCirrusLogictargetLevel = 85.0;
               }
@@ -996,111 +1103,16 @@
             if (targetLevel == 75) {
               isCirrusLogictargetLevel = 75.0;
             } else {
-              isCirrusLogictargetLevel = 85.0;
+              isCirrusLogictargetLevel = 75.0;
             }
           }
-
-
-          for (let q = 1; q <= mCount; q++) {
-            if (!measurements[q]) continue; // Skip if measurement doesn't exist
-
-            const name = measurements[q].title;
-
-            console.log(`Checking ${name} SPL offset`);
-
-            const currentOffset = parseFloat(measurements[q].splOffsetdB);
-            console.log(`Current SPL offset for ${name}: ${currentOffset} dB`);
-
-
-            console.log(`Target level: ${isCirrusLogictargetLevel}dB`);
-            console.log(`Current SPL offset: ${currentOffset}dB`);
-            console.log(`This should result in measurements around ${isCirrusLogictargetLevel}dB`);
-
-            const correctionOffset = isCirrusLogictargetLevel - currentOffset;
-            console.log(`Applying correction offset for ${name}: ${correctionOffset} dB`);
-
-            const requestOptions = {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                command: "Add SPL offset",
-                parameters: {
-                  offset: correctionOffset,
-                },
-              }),
-            };
-
-            try {
-              const response = await fetch(`http://localhost:4735/measurements/${q}/command`, requestOptions);
-              if (response.ok) {
-                console.log(`✔ Successfully corrected SPL offset for ${name}`);
-
-              } else {
-                console.error(`✘ Failed to correct SPL offset for ${name}`);
-              }
-            } catch (error) {
-              console.error(`Error correcting ${name}:`, error);
-            }
-          }
-
-
-          for (let q = 1; q <= mCount; q++) {
-            if (!measurements[q]) continue; // Skip if measurement doesn't exist
-            const name = measurements[q].title;
-            console.log(`Checking ${name}`);
-
-            const PUTrequestOptions = {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                title: name,
-              }),
-            };
-
-            try {
-              const response = await fetch(`http://localhost:4735/measurements/${q}`, PUTrequestOptions);
-              if (response.ok) {
-                console.log(`✔ Successfully corrected name ${name} for ${name}`);
-
-              } else {
-                console.error(`✘ Failed to correct name ${name} for ${name}`);
-              }
-            } catch (error) {
-              console.error(`Error correcting name ${name}:`, error);
-            }
-          }
-
-          for (let q = 1; q <= mCount; q++) {
-            if (!measurements[q]) continue; // Skip if measurement doesn't exist
-            const name = measurements[q].title;
-            const notes = measurements[q].notes;
-
-            console.log(`Updating notes for ${name}`);
-
-            const PUTNAMErequestOptions = {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                "notes": notes + " ," + nextversion + " name change",
-              }),
-            };
-
-            try {
-              const response = await fetch(`http://localhost:4735/measurements/${q}`, PUTNAMErequestOptions);
-              if (response.ok) {
-                console.log(`✔ Successfully added notes for ${name}`);
-
-              } else {
-                console.error(`✘ Failed add notes for ${name}`);
-              }
-            } catch (error) {
-              console.error(`Error adding notes for ${name}:`, error);
-            }
-          }
-
-
         } catch (error) {
-          console.error("Error fetching measurements:", error);
+          if (error.message.includes("Unsupported measurement type")) {
+            // Don't just log - actually stop the script
+            process.exit(1);
+          } else {
+            console.error("Error fetching measurements:", error);
+          }
         }
       }
 
@@ -1295,7 +1307,7 @@
         console.infoUpdate("Completed applying Audyssey microphone calibration file to measurements.");
       }
 
-      // Fallback version that skips microcal if it fails
+      // Fallback version that skips microcal if it fails > Not needed anymore.... Clean later
       async function addmicCalWithSkipOption() {
         try {
           // Try the original addmicCal first
@@ -1373,15 +1385,25 @@
 
         if (isRP22mode == true || isRP22mode == 1) {
           console.warn(`  CEDIA RP22 mode set to ${isRP22mode}`);
-        } else {
-          console.info(`  CEDIA RP22 mode set to ${isRP22mode}`);
+        }
+
+        if (isDolbymode == true || isDolbymode == 1) {
+          console.warn(`  DOLBY mode set to ${isDolbymode}`);
+        }
+
+        if (isTHXmode == true || isTHXmode == 1) {
+          console.warn(`  THX mode set to ${isTHXmode}`);
+        }
+
+        if (isIMAXmode == true || isIMAXmode == 1) {
+          console.warn(`  IMAX mode set to ${isIMAXmode}`);
         }
 
         if (freqIndex.includes(180)) {
           console.info("  AVR supports 180Hz");
         }
         if (freqIndex.includes(70)) {
-          console.info("  AVR 'supports' IMAX 70Hz");
+          console.info("  AVR supports IMAX 70Hz");
         }
 
         if (noInversion) {
@@ -1457,20 +1479,28 @@
         let baseMessage = "Resetting IR windows, EQ type, target shape and smoothing for all measurements..."
         for (let q = 1; q <= mCount; q++) {
           await postSafe(`${baseUrl}/${q}/ir-windows`, { leftWindowType: "Rectangular", rightWindowType: "Rectangular" }, "Update processed");
-          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 3));
           await postSafe(`${baseUrl}/${q}/equaliser`, { manufacturer: "Generic", model: "Generic" }, "Equaliser selected");
-          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 3));
           await postSafe(`${baseUrl}/${q}/target-settings`, { shape: "None" }, "Update processed");
-          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 3));
           await postNext('Smooth', q, { smoothing: "1/48" });
-          await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
+          await new Promise((resolve) => setTimeout(resolve, speedDelay / 3));
           console.infoUpdate(`${baseMessage} (${q}/${mCount})`);
         }
         await console.infoUpdate("Resetting default equalizer to 'Generic/Generic'...");
         await postSafe(`http://localhost:4735/eq/default-equaliser`, { manufacturer: "Generic", model: "Generic" }, "Default equaliser changed");
-        await new Promise((resolve) => setTimeout(resolve, speedDelay / 2));
-        const firstTitle = measurements[1].title;
+        await new Promise((resolve) => setTimeout(resolve, speedDelay / 3));
 
+        await console.infoUpdate(`Resetting default target level to ${targetLevel}dB...`);
+        await fetch("http://localhost:4735/eq/default-target-level", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: Number(targetLevel).toFixed(1),
+        });
+        await new Promise((resolve) => setTimeout(resolve, speedDelay / 3));
+
+        const firstTitle = measurements[1].title;
         console.infoUpdate(`Checking measurement names, indices and sorting...`);
 
         // First pass: build titleIndices using current version's logic
@@ -1678,19 +1708,7 @@
           throw new Error;
         }
 
-        // BEFORE addmicCal
-        if (parseFloat(measurements[1].splOffsetdB) < isCirrusLogictargetLevel) {
-          console.log(`BEFORE addmicCal >> LESS < ${isCirrusLogictargetLevel} - parseFloat(measurements[1].splOffsetdB",`, parseFloat(measurements[1].splOffsetdB));
-        } else if (parseFloat(measurements[1].splOffsetdB) > isCirrusLogictargetLevel) {
-          console.log(`BEFORE addmicCal >> GREATER > ${isCirrusLogictargetLevel} - parseFloat(measurements[1].splOffsetdB",`, parseFloat(measurements[1].splOffsetdB));
-        } else {
-          console.log(`BEFORE addmicCal >> EQUAL = ${isCirrusLogictargetLevel} - parseFloat(measurements[1].splOffsetdB",`, parseFloat(measurements[1].splOffsetdB));
-        }
-
-        /*
-        if (isCirrusLogic) { await addmicCal(); } // only apply if all sanity checks pass
-        */
-        // In bootUp function, before the addmicCal call:
+        // only apply if all sanity checks pass
         if (isCirrusLogic) {
           try {
             await addmicCal();
@@ -1706,21 +1724,6 @@
             } else {
               throw error;
             }
-          }
-        }
-
-        const nmeasurements = await fetch_mREW();
-        const ntitles = {}; let ntitleIndices = {};
-        let nmCount = Object.keys(nmeasurements).length;
-        // Rename all measurements that have "-copy" suffix
-        for (let q = 1; q <= nmCount; q++) {
-          // AFTER addmicCal
-          if (parseFloat(nmeasurements[q].splOffsetdB) < isCirrusLogictargetLevel) {
-            console.log(`AFTER addmicCal >> LESS < ${isCirrusLogictargetLevel} - parseFloat(nmeasurements[q].splOffsetdB",`, parseFloat(nmeasurements[q].splOffsetdB));
-          } else if (parseFloat(nmeasurements[q].splOffsetdB) > isCirrusLogictargetLevel) {
-            console.log(`AFTER addmicCal >> GREATER > ${isCirrusLogictargetLevel} - parseFloat(nmeasurements[q].splOffsetdB",`, parseFloat(nmeasurements[q].splOffsetdB));
-          } else {
-            console.log(`AFTER addmicCal >> EQUAL = ${isCirrusLogictargetLevel} - parseFloat(nmeasurements[q].splOffsetdB",`, parseFloat(nmeasurements[q].splOffsetdB));
           }
         }
 
@@ -1744,6 +1747,22 @@
           const targetCurve = await postNext('Generate target measurement', 1);
           const targetCurveIdx = Object.keys(targetCurve.results)[0];
           targetResponse = await fetchSafe(`frequency-response?smoothing=1%2F48&ppo=96`, targetCurveIdx);
+
+          if (isDebugMode) {
+            // ADD THIS DEBUG BLOCK
+            console.log("=== TARGET CURVE SPL DEBUG ===");
+            const targetArray200to2000 = response2array(targetResponse, 200, 2000);
+            const targetSPL200to2000 = targetArray200to2000.reduce((acc, val) => acc + val, 0) / targetArray200to2000.length;
+            console.log(`Target curve average SPL (200-2000Hz): ${targetSPL200to2000.toFixed(1)}dB`);
+
+            const targetArray30to80 = response2array(targetResponse, 30, 80);
+            const targetSPL30to80 = targetArray30to80.reduce((acc, val) => acc + val, 0) / targetArray30to80.length;
+            console.log(`Target curve average SPL (30-80Hz): ${targetSPL30to80.toFixed(1)}dB`);
+
+            console.log(`Target level setting: ${targetLevel}dB`);
+            console.log("=== END TARGET CURVE DEBUG ===");
+          }
+
           Object.freeze(targetResponse); // ensure it doesn't change once optimization starts
           await postDelete(targetCurveIdx);
         }
@@ -1777,8 +1796,8 @@
         const limInsec = 6 / sOs;
         const msecMin = maxM - limInsec;
         const msecMax = minM + limInsec;
-        const maxNegative = msecMin * 1000;
-        const maxPositive = msecMax * 1000;
+        const maxNegative = msecMin * delaymax;
+        const maxPositive = msecMax * delaymax;
         if (maxNegative > maxPositive) {
           console.error("Ran out of delay range!");
           throw new Error;
@@ -1789,16 +1808,9 @@
       // returns range that "thisDelay" can be shifted by
       function getDelayRangeOf(thisDelay, startIdx, endIdx) {
         const [maxNegative, maxPositive] = getDelayHeadroom(startIdx, endIdx);
-        const delayms = thisDelay * 1000;
-        let loDelay = Infinity, hiDelay = -Infinity;
-        if (thisDelay < 0) {
-          loDelay = maxNegative - delayms;
-          hiDelay = maxPositive;
-        }
-        else {
-          loDelay = maxNegative;
-          hiDelay = maxPositive - delayms;
-        }
+        const delayms = thisDelay * delaymax;
+        const loDelay = maxNegative - delayms;
+        const hiDelay = maxPositive - delayms;
         if (loDelay > hiDelay) {
           console.error("Ran out of delay range!");
           throw new Error;
@@ -1807,7 +1819,7 @@
       }
 
       function getDelayRangeOfFinalSub() {
-        let [loDelay, hiDelay] = getDelayRangeOf(mSec[nChannels]);
+        let [loDelay, hiDelay] = getDelayRangeOf(mSec[nChannels], 1, nSpeakers);
         // directional subwoofer delay(s)
         if (bassMode === "Directional") {
           const loDelaySub = Math.min(...mSec.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
@@ -1816,7 +1828,7 @@
           [, hiDelay] = getDelayRangeOf(hiDelaySub, 1, nSpeakers);
         }
         // standard bass relative delay(s)
-        else {
+        else if (subLoDelay != 0 || subHiDelay != 0) {
           [loDelay,] = getDelayRangeOf(mSec[nChannels] + subLoDelay, 1, nSpeakers);
           [, hiDelay] = getDelayRangeOf(mSec[nChannels] + subHiDelay, 1, nSpeakers);
         }
@@ -1842,10 +1854,7 @@
           if (name.startsWith("SW")) { await postDelete(i); }
         }
         const micPositions = mCount / (nSpeakers + nSubs);
-        /*
-        if (bassMode != "Directional" && swChannelCount > 1) { console.info(`'Standard bass' mode with '${swChannelCount}' subwoofers detected.`); }
-        if (bassMode != "Directional" && swChannelCount === 1) { console.info(`'Standard bass' mode with '${swChannelCount}' subwoofer detected.`); }
-        */
+
         if (bassMode != "Directional" && swChannelCount > 1) {
           bassMode = "Standard";
           console.info(`'Standard bass' mode with '${swChannelCount}' subwoofers detected.`);
@@ -1868,7 +1877,7 @@
           if (micPositions > 1) {
             await postNext('Cross corr align', indices);
           }
-          mSec[count] = parseFloat(measurements[i].cumulativeIRShiftSeconds);
+          mSec[count] = 0;
           title[count] = measurements[i].title.slice(0, -1) + "o";
           if (title[count].startsWith("SW")) { title[count] = title[count].slice(0, -6) + "o"; }
           // trim determination using the MLP measurement
@@ -1889,9 +1898,7 @@
           // the "o" measurement
           const idx = mCount + count;
           await fetch_mREW(idx, 'PUT', { title: title[count] });
-          // align "o" measurement to target curve
-          let volAdjust = parseFloat(customLevel[count]);
-          await postNext('Add SPL offset', idx, { offset: volAdjust });
+          await postNext('Add SPL offset', idx, { offset: customLevel[count] });
           // go to next channel
           count++;
         }
@@ -1918,6 +1925,7 @@
           mSec[i] -= (parseFloat(measurements[i].cumulativeIRShiftSeconds) - IRStartDelay);
         }
 
+        // Normalize Trim levels targetLevel vs 75dB
         normalizeTrimLevels();
 
         console.infoUpdate("Completed averaging, volume & time alignment!");
@@ -1964,7 +1972,19 @@
 
       async function getALOffset(idx, isSub) {
         const fltResponse = await fetchSafe('frequency-response?smoothing=1%2F1&ppo=96', idx);
-        const fltArray = isSub ? await response2array(fltResponse, 30, 80) : await response2array(fltResponse, 500, 2000);
+        // let lowFreq, highFreq;
+        if (isRP22mode) {
+          lowFreq = 20; highFreq = 120;
+        } else if (isDolbymode) {
+          lowFreq = 31.5; highFreq = 120;
+        } else if (isTHXmode) {
+          lowFreq = 20; highFreq = 120;
+        } else if (isIMAXmode) {
+          lowFreq = 20; highFreq = 70;
+        } else {
+          lowFreq = 30; highFreq = 80;
+        }
+        const fltArray = isSub ? await response2array(fltResponse, lowFreq, highFreq) : await response2array(fltResponse, 500, 2000);
         const offset = fltArray.reduce((acc, val) => acc + val, 0) / fltArray.length;
         return offset;
       }
@@ -1974,18 +1994,16 @@
 
         // ===== FILTER CONFIGURATION =====
         // Set these variables to enable different filter types:
-
         // Hearing loss compensation: "research", "moderate", "severe", "original", or null
         // const hearingLossType = "research";
-
         // Gaming EQ optimization: "competitive", "immersive", "voice", "balanced", or null  
         // - "competitive": Optimized for footsteps, gunshots, tactical audio (FPS games)
         // - "immersive": Cinematic experience with enhanced atmosphere (RPG/Adventure) 
         // - "voice": Clear voice chat communication with game audio
         // - "balanced": All-purpose gaming enhancement
         // const gamingEQType = "competitive";
-
         // Dialog enhancement: controlled by existing RP22DialogEnhancementFilter boolean
+        // Disabled all HP as the filters get messed up!
 
         // Smart filter creation helper - handles REW API parameter requirements
         const createREWFilter = (index, type, frequency, gaindB = 0, q = 1.0) => ({
@@ -2040,14 +2058,14 @@
             case "HLOSSmoderate":
               return {
                 filters: [
-                  createREWFilter(11, "HP", 80),                // Remove low-frequency masking
+                  // createREWFilter(11, "HP", 80),               // Remove low-frequency masking
                   createREWFilter(12, "PK", 2500, 3.0, 1.0),   // Speech intelligibility range
                   createREWFilter(13, "PK", 4000, 5.0, 1.3),   // 4kHz notch compensation
                   createREWFilter(14, "HS", 6000, 3.0)         // General high-frequency lift
                 ],
                 description: "Moderate Hearing Loss Compensation",
                 targets: [
-                  "- 80Hz: High-pass filter (remove masking)",
+                  // "- 80Hz: High-pass filter (remove masking)",
                   "- 2.5kHz: +3.0dB (Speech intelligibility)",
                   "- 4kHz: +5.0dB (Notch compensation)",
                   "- 6kHz+: +3.0dB (High-frequency lift)"
@@ -2057,7 +2075,7 @@
             case "HLOSSsevere":
               return {
                 filters: [
-                  createREWFilter(11, "HP", 100),              // Aggressive low-cut
+                  // createREWFilter(11, "HP", 100),              // Aggressive low-cut
                   createREWFilter(12, "PK", 2000, 6.0, 1.0),   // Strong speech boost
                   createREWFilter(13, "PK", 4000, 10.0, 1.5),  // Maximum 4kHz compensation
                   createREWFilter(14, "PK", 6000, 12.0, 1.5),  // Strong 6kHz boost
@@ -2065,7 +2083,7 @@
                 ],
                 description: "Severe Hearing Loss Compensation",
                 targets: [
-                  "- 100Hz: High-pass filter (aggressive low-cut)",
+                  // "- 100Hz: High-pass filter (aggressive low-cut)",
                   "- 2kHz: +6.0dB (Strong speech boost)",
                   "- 4kHz: +10.0dB (Maximum compensation)",
                   "- 6kHz: +12.0dB (Strong high-frequency boost)",
@@ -2224,7 +2242,6 @@
 
           // Apply Advanced Filters (if enabled, has a type other than null and is not subwoofer) 
           if (AdvancedFilters && AdvancedFiltersType !== "null" && commandId[i] !== "SW" && commandId[i] !== "SW1" && commandId[i] !== "SWMIX") {
-
             // For DIALOGadvanced, ONLY apply to center channel
             if (AdvancedFiltersType === "DIALOGadvanced") {
               if (commandId[i] === "C") {
@@ -2233,7 +2250,7 @@
 
                 if (AdvanedFiltersConfig) {
                   console.log(`APPLYING ${AdvanedFiltersConfig.description} to:`, commandId[i]);
-                  console.info("Gaming optimization targets:");
+                  console.info("Advanced Filter Optimization Targets:");
 
                   // Apply filters sequentially with delays
                   for (let j = 0; j < AdvanedFiltersConfig.filters.length; j++) {
@@ -2246,7 +2263,7 @@
                   // Log all targets
                   AdvanedFiltersConfig.targets.forEach(target => console.info(target));
 
-                  console.log(`${AdvanedFiltersConfig.description} applied successfully`);
+                  console.log(`${AdvanedFiltersConfig.description} applied successfully to:`, commandId[i]);
                 }
               }
               // If not center channel, do nothing (skip)
@@ -2256,7 +2273,7 @@
 
               if (AdvanedFiltersConfig) {
                 console.log(`APPLYING ${AdvanedFiltersConfig.description} to:`, commandId[i]);
-                console.info("Gaming optimization targets:");
+                console.info("Advanced Filter Optimization Targets:");
 
                 // Apply filters sequentially with delays
                 for (let j = 0; j < AdvanedFiltersConfig.filters.length; j++) {
@@ -2269,7 +2286,7 @@
                 // Log all targets
                 AdvanedFiltersConfig.targets.forEach(target => console.info(target));
 
-                console.log(`${AdvanedFiltersConfig.description} applied successfully`);
+                console.log(`${AdvanedFiltersConfig.description} applied successfully to:`, commandId[i]);
               }
             }
           }
@@ -2280,6 +2297,14 @@
           const filterName = `${commandId[i]}-filters`;
           await fetch_mREW(filterIdx, 'PUT', { title: filterName });
           const ALOffset = await getALOffset(filterIdx, isSub);
+
+          if (isDebugMode) {
+            // ADD THIS BEFORE THE AUTO-LEVEL OFFSET
+            console.log(`=== AUTO-LEVEL DEBUG for ${commandId[i]} ===`);
+            const beforeAL = await getALOffset(filterIdx, isSub);
+            console.log(`Auto-level offset calculated: ${beforeAL.toFixed(2)}dB`);
+            console.log(`This will be SUBTRACTED from the filter response`);
+          }
           await postNext('Add SPL offset', filterIdx, { offset: -ALOffset });
 
           // generate predicted equalized response using the auto leveled filter
@@ -2293,7 +2318,7 @@
           const trimOffset = tcLevelOffset + Math.round(ALOffset * 2) / 2; //round to nearest 0.5
 
           if (trimOffset != 0) {
-            await postNext('Add SPL offset', i, { offset: trimOffset }); // offset "o"
+            // await postNext('Add SPL offset', i, { offset: trimOffset }); // offset "o"
             await postNext('Add SPL offset', eqResponseIdx, { offset: trimOffset }); // offset "-equalized"
             const customLevelOriginal = customLevel[i];
             if (isSub) {
@@ -2305,6 +2330,14 @@
               customLevel[i] += trimOffset;
             }
             logUpdate += ` | auto-level offset: ${customLevelOriginal}dB → ${customLevel[i]}dB (${trimOffset}dB)`;
+
+            if (isDebugMode) {
+              console.log(`=== TRIM OFFSET DEBUG for ${commandId[i]} ===`);
+              console.log(`TC level offset: ${tcLevelOffset.toFixed(2)}dB`);
+              console.log(`Auto-level offset: ${ALOffset.toFixed(2)}dB`);
+              console.log(`Combined trim offset applied: ${trimOffset.toFixed(2)}dB`);
+              console.log(`customLevel change: ${customLevelOriginal.toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB`);
+            }
           }
           console.infoUpdate(logUpdate);
         }
@@ -2316,6 +2349,13 @@
       }
 
       function finalizeTrims() {
+        if (isDebugMode) {
+          console.log("=== FINAL TRIMS DEBUG ===");
+          console.log("Raw customLevel values BEFORE sanity check:");
+          for (let i = 1; i <= nSpeakers + nSubs; i++) {
+            console.log(`  ${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
+          }
+        }
         console.log("DEBUG!!!! Raw customLevel values before sanity check:", customLevel.slice(1, nSpeakers + nSubs + 1));
         console.log("These look like absolute SPL measurements (sound pressure level readings), not relative trim adjustments!")
         sanityCheckSpeakerTrims();
@@ -2387,6 +2427,7 @@
         return xo;
       }
 
+      // CURVE!!
       async function getLow3dBPoint(idx, start = 10, end = 320) {
         // const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
         let response;
@@ -2401,15 +2442,58 @@
         const tcArray = response2array(targetResponse, start, end);
         const arrLength = Math.min(rpArray.length, tcArray.length);
         const octave = Math.pow(2, 1 / 96);
+
         // find -3dB point
         let rolloff = start;
         for (let i = 0; i < arrLength; i++) {
           if ((rpArray[i] - tcArray[i]) >= -3) { break; }
           rolloff *= octave;
         }
+
+        if (isDebugMode) {
+          // ADD THIS ABSOLUTE LEVEL CHECK HERE ↓
+          console.log("=== ABSOLUTE LEVEL CHECK ===");
+
+          // Find speaker's actual peak level in measurement range
+          let maxLevel = -Infinity;
+          let maxLevelFreq = start;
+          for (let i = 0; i < rpArray.length; i++) {
+            if (rpArray[i] > maxLevel) {
+              maxLevel = rpArray[i];
+              maxLevelFreq = start * Math.pow(octave, i);
+            }
+          }
+
+          // Find true -3dB rolloff from speaker's own maximum
+          let absoluteRolloff = start;
+          for (let i = 0; i < rpArray.length; i++) {
+            // True -3dB from speaker's own maximum, not target-relative
+            if ((rpArray[i] - maxLevel) >= -3) { break; }
+            absoluteRolloff *= octave;
+          }
+
+          console.log(`Speaker peak: ${maxLevel.toFixed(1)}dB at ${maxLevelFreq.toFixed(1)}Hz`);
+          console.log(`Target-relative rolloff: ${rolloff.toFixed(1)}Hz`);
+          console.log(`Absolute -3dB rolloff: ${absoluteRolloff.toFixed(1)}Hz`);
+
+          // Audioholics reality check
+          if (rolloff < 40) {
+            console.warn(`⚠️  ${rolloff.toFixed(1)}Hz rolloff detected - likely room gain effect`);
+            console.warn("   Audioholics recommends ground plane measurements for true speaker response");
+          }
+
+          if (Math.abs(rolloff - absoluteRolloff) > 20) {
+            console.warn(`⚠️  Large difference between target-relative (${rolloff.toFixed(1)}Hz) and absolute (${absoluteRolloff.toFixed(1)}Hz) rolloffs`);
+            console.warn("   This suggests target curve issues or room acoustics effects");
+          }
+
+          console.log("=== END ABSOLUTE LEVEL CHECK ===");
+          // END ADDITION ↑
+        }
         return Math.min(rolloff, end);
       }
 
+      // CURVE!!
       async function getHigh3dBPoint(idx, start = 10, end = 320) {
         // const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
         let response;
@@ -2430,11 +2514,173 @@
           if ((rpArray[i] - tcArray[i]) >= -3) { break; }
           rolloff /= octave;
         }
+
+        if (isDebugMode) {
+          // ADD THIS ABSOLUTE LEVEL CHECK HERE ↓
+          console.log("=== ABSOLUTE LEVEL CHECK ===");
+
+          // Find speaker's actual peak level in measurement range
+          let maxLevel = -Infinity;
+          let maxLevelFreq = start;
+          for (let i = 0; i < rpArray.length; i++) {
+            if (rpArray[i] > maxLevel) {
+              maxLevel = rpArray[i];
+              maxLevelFreq = start * Math.pow(octave, i);
+            }
+          }
+
+          // Find true -3dB rolloff from speaker's own maximum
+          let absoluteRolloff = start;
+          for (let i = 0; i < rpArray.length; i++) {
+            // True -3dB from speaker's own maximum, not target-relative
+            if ((rpArray[i] - maxLevel) >= -3) { break; }
+            absoluteRolloff *= octave;
+          }
+
+          console.log(`Speaker peak: ${maxLevel.toFixed(1)}dB at ${maxLevelFreq.toFixed(1)}Hz`);
+          console.log(`Target-relative rolloff: ${rolloff.toFixed(1)}Hz`);
+          console.log(`Absolute -3dB rolloff: ${absoluteRolloff.toFixed(1)}Hz`);
+
+          // Audioholics reality check
+          if (rolloff < 40) {
+            console.warn(`⚠️  ${rolloff.toFixed(1)}Hz rolloff detected - likely room gain effect`);
+            console.warn("   Audioholics recommends ground plane measurements for true speaker response");
+          }
+
+          if (Math.abs(rolloff - absoluteRolloff) > 20) {
+            console.warn(`⚠️  Large difference between target-relative (${rolloff.toFixed(1)}Hz) and absolute (${absoluteRolloff.toFixed(1)}Hz) rolloffs`);
+            console.warn("   This suggests target curve issues or room acoustics effects");
+          }
+
+          console.log("=== END ABSOLUTE LEVEL CHECK ===");
+          // END ADDITION ↑
+        }
+
         return Math.max(rolloff, start);
+      }
+
+      // let modeSubXOMin = 31.5; let modeSubXOMax = 120;
+      async function getAbsLow3dBPointForSub(idx, start = 10, end = 300) {
+        // finds low -3dB point from mean SPL between 30-80hz
+        const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+        // const subArray = response2array(response, 30, 80);
+        // const subArray = response2array(response, 15, 200);
+        const subArray = response2array(response, modeSubXOMin - 10, modeSubXOMax + 10);
+        const subSPL = subArray.reduce((acc, val) => acc + val, 0) / subArray.length;
+        const rpArray = response2array(response, start, end);
+        const octave = Math.pow(2, 1 / 96);
+        let rolloff = start;
+        for (let i = 0; i < rpArray.length; i++) {
+          if ((rpArray[i] - subSPL) >= -3) { break; }
+          rolloff *= octave;
+        }
+        return Math.min(rolloff, end);
+      }
+
+      // let modeSubXOMin = 31.5; let modeSubXOMax = 120;
+      async function getAbsHigh3dBPointForSub(idx, start = 10, end = 300) {
+        // finds high -3dB point from mean SPL between 30-80hz
+        const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+        // const subArray = response2array(response, 30, 80);
+        // const subArray = response2array(response, 15, 200);
+        const subArray = response2array(response, modeSubXOMin - 10, modeSubXOMax + 10);
+        const subSPL = subArray.reduce((acc, val) => acc + val, 0) / subArray.length;
+        const rpArray = response2array(response, start, end);
+        const octave = Math.pow(2, 1 / 96);
+        let rolloff = end;
+        for (let i = rpArray.length - 1; i >= 0; i--) {
+          if ((rpArray[i] - subSPL) >= -3) { break; }
+          rolloff /= octave;
+        }
+        return Math.max(rolloff, start);
+      }
+
+      // let modeSpkMin = 20; let modeSpkMax = 20000;
+      // async function getAbsLow3dBPointForSpk(idx, start = 20, end = 20000) {
+      async function getAbsLow3dBPointForSpk(idx, start = modeSpkMin, end = modeSpkMax) {
+        // finds low -3dB point from mean SPL in speaker's optimal midrange
+        const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+
+        // Use midrange reference band for speakers (not bass range like subs)
+        const refArray = response2array(response, 500, 2000);  // Speaker midrange reference
+        const refSPL = refArray.reduce((acc, val) => acc + val, 0) / refArray.length;
+
+        const rpArray = response2array(response, start, end);
+        const octave = Math.pow(2, 1 / 96);
+        let rolloff = start;
+
+        for (let i = 0; i < rpArray.length; i++) {
+          if ((rpArray[i] - refSPL) >= -3) { break; }
+          rolloff *= octave;
+        }
+        return Math.min(rolloff, end);
+      }
+
+      // let modeSpkMin = 20; let modeSpkMax = 20000;
+      // async function getAbsHigh3dBPointForSpk(idx, start = 20, end = 20000) {
+      async function getAbsHigh3dBPointForSpk(idx, start = modeSpkMin, end = modeSpkMax) {
+        // finds high -3dB point from mean SPL in speaker's optimal midrange  
+        const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+
+        // Use midrange reference band for speakers
+        const refArray = response2array(response, 500, 2000);  // Speaker midrange reference
+        const refSPL = refArray.reduce((acc, val) => acc + val, 0) / refArray.length;
+
+        const rpArray = response2array(response, start, end);
+        const octave = Math.pow(2, 1 / 96);
+        let rolloff = end;
+
+        for (let i = rpArray.length - 1; i >= 0; i--) {
+          if ((rpArray[i] - refSPL) >= -3) { break; }
+          rolloff /= octave;
+        }
+        return Math.max(rolloff, start);
+      }
+
+      // async function getSpeakerHFRolloff(idx, start = 10000, end = 20000) {
+      async function getSpeakerHFRolloff(idx, start = 10000, end = 20000) {
+        // goal of this function is to find the roll-off past 10k before any HF peaks that can mess with the high shelf
+        const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
+        const rpArray = response2array(response, start, end);
+        const tcArray = response2array(targetResponse, start, end);
+        const arrLength = Math.min(rpArray.length, tcArray.length);
+        const octave = Math.pow(2, 1 / 96);
+        let checkFreq = start;
+        let rolloff = checkFreq;
+        let lowestSPL = rpArray[0];
+        for (let i = 0; i < arrLength; i++) {
+          if (rpArray[i] < lowestSPL) {
+            lowestSPL = rpArray[i];
+            rolloff = checkFreq;
+          }
+          // if HF peak exceeds lowest point by 3dB, set roll-off before that peak
+          // also if HF drops below target by 3dB, stop there otherwise high shelf will fail
+          if ((rpArray[i] - lowestSPL >= 3) || (rpArray[i] - tcArray[i] <= -3)) {
+            break;
+          }
+          checkFreq *= octave;
+        }
+        return Math.min(rolloff, end);
       }
 
       async function calculateRolloffs() {
         console.log("Calculating speaker -3dB points from target curve...");
+
+        if (isDebugMode) {
+          // ADD THIS DEBUG CODE HERE ↓
+          console.log("=== TARGET CURVE DEBUG ===");
+          console.log("Target curve in bass region:");
+          const debugTcArray = response2array(targetResponse, 20, 100);
+          for (let i = 0; i < debugTcArray.length; i += 8) { // Every 8th point to avoid spam
+            const freq = 20 * Math.pow(2, i / 96);
+            if (freq <= 100) {
+              console.log(`${freq.toFixed(1)}Hz: ${debugTcArray[i].toFixed(1)}dB`);
+            }
+          }
+          console.log("=== END TARGET CURVE DEBUG ===");
+          // END DEBUG CODE ↑
+        }
+
         const measurements = await fetch_mREW();
         for (let i = 1; i <= nSpeakers; i++) {
           const title = measurements[i].title;
@@ -2448,29 +2694,55 @@
             idx = Object.keys(pairAvg.results)[0];
           }
           const rolloff = await getLow3dBPoint(idx);
+          const rolloffHF = await getSpeakerHFRolloff(i); // speaker specific, not pair specific
 
           if (isRP22mode == true) {
             m3dBPoints[i] = [Math.round(rolloff), 15000];
             console.info("calculateRolloffs: applying CEDIA RP22 - 15000 rolloff");
+          } else if (isDolbymode == true) {
+            m3dBPoints[i] = [Math.round(rolloff), 16000];
+            console.info("calculateRolloffs: applying DOLBY - 16000 rolloff");
+          } else if (isTHXmode == true) {
+            m3dBPoints[i] = [Math.round(rolloff), 20000];
+            console.info("calculateRolloffs: applying THX - 20000 rolloff");
+          } else if (isIMAXmode == true) {
+            m3dBPoints[i] = [Math.round(rolloff), 20000];
+            console.info("calculateRolloffs: applying IMAX - 20000 rolloff");
           } else {
-            m3dBPoints[i] = [Math.round(rolloff), 12500]; // audy mic generally garbage past 10k and messes with high shelf
-            console.info("calculateRolloffs: applying Default - 12500 rolloff");
+            // m3dBPoints[i] = [Math.round(rolloff), 12500]; // audy mic generally garbage past 10k and messes with high shelf
+            m3dBPoints[i] = [Math.round(rolloff), Math.round(rolloffHF)];
+            // console.info("calculateRolloffs: applying Default - 12500 rolloff");
+            // console.info("calculateRolloffs: applying Default - calculated rolloff");
+            console.info(`calculateRolloffs: applying Default - ${Math.round(rolloffHF)} rolloff`);
           }
-
 
           let initialXO = findNearestXO(rolloff);
           // edge case for no subwoofer
           if (noSub && cmdIds.endsWith("FL & FR")) {
             initialXO = "L";
           }
+
           customCrossover[i] = initialXO;
           if (!singleChannel) {
+            const rolloffHFR = await getSpeakerHFRolloff(i + 1); // speaker specific, not pair specific
             if (isRP22mode == true) {
               m3dBPoints[i + 1] = [Math.round(rolloff), 15000];
               console.info("calculateRolloffs: applying CEDIA RP22 - 15000 rolloff");
+            } else if (isDolbymode == true) {
+              m3dBPoints[i + 1] = [Math.round(rolloff), 16000];
+              console.info("calculateRolloffs: applying DOLBY - 16000 rolloff");
+            } else if (isTHXmode == true) {
+              m3dBPoints[i + 1] = [Math.round(rolloff), 20000];
+              console.info("calculateRolloffs: applying THX - 20000 rolloff");
+            } else if (isIMAXmode == true) {
+              m3dBPoints[i + 1] = [Math.round(rolloff), 20000];
+              console.info("calculateRolloffs: applying IMAX - 20000 rolloff");
             } else {
-              m3dBPoints[i + 1] = [Math.round(rolloff), 12500]; // audy mic generally garbage past 10k and messes with high shelf
-              console.info("calculateRolloffs: applying Default - 12500 rolloff");
+              // m3dBPoints[i] = [Math.round(rolloff), 12500]; // audy mic generally garbage past 10k and messes with high shelf
+              m3dBPoints[i + 1] = [Math.round(rolloff), Math.round(rolloffHFR)];
+              // console.info("calculateRolloffs: applying Default - 12500 rolloff");
+              // console.info("calculateRolloffs: applying Default - calculated rolloff");
+              console.info(`calculateRolloffs: applying Default - ${Math.round(rolloffHFR)} rolloff`);
             }
             customCrossover[i + 1] = initialXO;
             i++;
@@ -2573,15 +2845,14 @@
         let subMoves = 0;
         if (isPossible) {
           subMoves = requiredDelay;
-        }
-        else {
+        } else {
           console.warn(`Required delay for alignment is too large! Subwoofer(s) set to max possible distance but results will not be optimal.`);
           const [loDelay,] = getDelayRangeOfFinalSub();
           subMoves = loDelay;
           isInverted = false;
         }
         if (isInverted) { await postSafe(`${baseUrl}/${nChannels * 3}/command`, { command: "Invert" }, "Invert completed"); }
-        subMoves /= 1000;
+        subMoves /= delaymax;
         await postNext('Offset t=0', nChannels * 3, { offset: -subMoves, unit: "seconds" });
         if (bassMode === "Directional") {
           for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
@@ -2637,48 +2908,6 @@
         }
       }
 
-      /* ALL SPEAKERS
-      function initializeDistances() {
-        // initialize to 0
-        for (let i = 1; i <= nSpeakers + nSubs; i++) {
-          customDistance[i] = 0;
-        }
-        if (noSub) { return; }
-  
-        const flIndex = getFLIndex();
-        let globalMinDist = Infinity;
-  
-        // Check all main speakers
-        for (let i = 1; i <= nSpeakers; i++) {
-          const dist = flDist + (mSec[flIndex] - mSec[i]) * sOs;
-          globalMinDist = Math.min(globalMinDist, dist);
-        }
-  
-        // Check subwoofers with their specific delay calculations
-        if (bassMode === "Directional") {
-          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
-            const distSub = flDist + (mSec[flIndex] - mSec[i]) * sOs;
-            globalMinDist = Math.min(globalMinDist, distSub);
-          }
-        } else {
-          const distMainSub = flDist + (mSec[flIndex] - mSec[nChannels]) * sOs;
-          const distLoSub = distMainSub - subLoDelay * sOs;
-          const distHiSub = distMainSub - subHiDelay * sOs;
-          globalMinDist = Math.min(globalMinDist, distLoSub, distHiSub);
-        }
-  
-        // Apply single correction if needed
-        if (globalMinDist < 0) {
-          console.warn(`Distances are being shifted by ${Math.abs(globalMinDist).toFixed(2)}m to ensure all distances are positive!`);
-          console.info("This adjustment will ONLY improve overall sound quality.");
-          console.info("The receiver only accounts for relative time delays between speakers which are being kept intact.");
-          for (let i = 1; i <= nSpeakers + nSubs; i++) {
-            customDistance[i] += Math.abs(globalMinDist);
-          }
-        }
-      }
-      */
-
       function finalizeDistances() {
         initializeDistances();
         const flIndex = getFLIndex();
@@ -2711,38 +2940,98 @@
       async function finalizeXO(start = 20, end = 250) {
         if (noSub) { return; } // no need to go further without subwoofer
 
-        // Get the selected range from the slider
-        const sliderRange = sliderInstance ? sliderInstance.getSelectedRange() : null;
-        const minSelectedFreq = sliderRange ? sliderRange.min : 20;
-        const maxSelectedFreq = sliderRange ? sliderRange.max : 250;
+        // Speaker type mappings
+        const speakerMappings = {
+          BED: {
+            front: ["FL", "FR"],
+            frontWide: ["FWL", "FWR"],
+            surroundBack: ["SBL", "SBR"],
+            surroundBackSingle: ["SB"],
+            surround: ["SLA", "SRA"],
+            center: ["C"]
+          },
+          HEIGHT: {
+            frontHeight: ["FHL", "FHR"],
+            rearHeight: ["RHL", "RHR"],
+            surroundHeight: ["SHL", "SHR"],
+            topFront: ["TFL", "TFR"],
+            topMiddle: ["TML", "TMR"],
+            topRear: ["TRL", "TRR"],
+            upfiringBack: ["BDL", "BDR"],
+            upfiringFront: ["FDL", "FDR"],
+            upfiringSurround: ["SDL", "SDR"],
+            topSurround: ["TS"],
+            centerHeight: ["CH"]
+          }
+        };
 
-        console.log(`Applying crossover optimization within slider range: ${minSelectedFreq}Hz - ${maxSelectedFreq}Hz`);
-        console.log("Finalizing crossover frequencies to best follow the target curve...");
+        // Create flat arrays for easy lookup
+        const bedSpeakers = Object.values(speakerMappings.BED).flat();
+        const heightSpeakers = Object.values(speakerMappings.HEIGHT).flat();
 
-        // **ADD THIS - Calculate effective usable range**
-        const effectiveMinXO = Math.max(minXO, minSelectedFreq);
-        const effectiveMaxXO = Math.min(maxXO, maxSelectedFreq);
-
-        // **ADD THIS - Optional warning if ranges don't fully overlap**
-        if (minSelectedFreq < minXO || maxSelectedFreq > maxXO) {
-          console.warn(`⚠️ Slider range (${minSelectedFreq}Hz - ${maxSelectedFreq}Hz) extends beyond subwoofer bandwidth (${minXO}Hz - ${maxXO}Hz)`);
+        // Function to determine speaker layer type
+        function getSpeakerLayer(speakerId) {
+          if (bedSpeakers.includes(speakerId)) {
+            return 'BED';
+          } else if (heightSpeakers.includes(speakerId)) {
+            return 'HEIGHT';
+          } else {
+            return 'UNKNOWN';
+          }
         }
 
-        // Filter freqIndex to only include frequencies within slider range
-        const filteredFreqIndex = freqIndex.filter(freq =>
-          freq >= effectiveMinXO && freq <= effectiveMaxXO
-        );
+        // Get ranges from both sliders
+        const bedSliderRange = sliderInstances.bed ? sliderInstances.bed.getSelectedRange() : null;
+        const heightSliderRange = sliderInstances.height ? sliderInstances.height.getSelectedRange() : null;
 
-        console.log(`Filtered frequency range: ${filteredFreqIndex.length} frequencies from ${filteredFreqIndex[0] || 'none'} to ${filteredFreqIndex[filteredFreqIndex.length - 1] || 'none'}Hz`);
+        // Extract frequency ranges based on slider mode
+        let bedMinFreq, bedMaxFreq, heightMinFreq, heightMaxFreq;
 
-        // Use existing calculateRMSError function (defined elsewhere in script)
+        if (bedSliderRange) {
+          if (bedSliderRange.mode === "single") {
+            bedMinFreq = bedMaxFreq = bedSliderRange.value;
+          } else {
+            bedMinFreq = bedSliderRange.min;
+            bedMaxFreq = bedSliderRange.max;
+          }
+        } else {
+          bedMinFreq = bedMaxFreq = null;
+        }
+
+        if (heightSliderRange) {
+          if (heightSliderRange.mode === "single") {
+            heightMinFreq = heightMaxFreq = heightSliderRange.value;
+          } else {
+            heightMinFreq = heightSliderRange.min;
+            heightMaxFreq = heightSliderRange.max;
+          }
+        } else {
+          heightMinFreq = heightMaxFreq = null;
+        }
+
+        console.log(`BED layer range: ${bedMinFreq}Hz - ${bedMaxFreq}Hz`);
+        console.log(`HEIGHT layer range: ${heightMinFreq}Hz - ${heightMaxFreq}Hz`);
+        console.log("Finalizing crossover frequencies to best follow the target curve...");
+
+        // Function to get the appropriate frequency range for a speaker
+        function getSpeakerFreqRange(speakerId) {
+          const layer = getSpeakerLayer(speakerId);
+
+          if (layer === 'BED' && bedMinFreq !== null && bedMaxFreq !== null) {
+            return { min: bedMinFreq, max: bedMaxFreq, layer: 'BED' };
+          } else if (layer === 'HEIGHT' && heightMinFreq !== null && heightMaxFreq !== null) {
+            return { min: heightMinFreq, max: heightMaxFreq, layer: 'HEIGHT' };
+          } else {
+            // Fallback to default range if no slider available or speaker type unknown
+            console.warn(`⚠️ Using default range for ${speakerId} (${layer} layer)`);
+            return { min: 20, max: 250, layer: 'DEFAULT' };
+          }
+        }
 
         const measurements = await fetch_mREW();
         const mCount = Object.keys(measurements).length;
         const targetArray = response2array(targetResponse, start, end);
         let count = 1;
-
-        console.info(`Usable XO range: ${effectiveMinXO}hz - ${effectiveMaxXO}hz (combined subwoofer bandwidth + slider range)`);
 
         for (let i = nChannels + 2; i <= nChannels * 3; i += 2) {
           if (commandId[count].startsWith("SW")) { continue; }
@@ -2751,10 +3040,32 @@
           const singleChannel = isSingleChannel(commandId[count]);
           const cmdIds = (singleChannel ? commandId[count] : `${commandId[count]} & ${commandId[1 + count]}`).padStart(9, ".");
 
+          // Get the appropriate frequency range for this speaker
+          const primarySpeakerId = commandId[count];
+          const speakerRange = getSpeakerFreqRange(primarySpeakerId);
+
+          console.log(`${cmdIds} using ${speakerRange.layer} layer range: ${speakerRange.min}Hz - ${speakerRange.max}Hz`);
+
+          // Calculate effective usable range for this speaker
+          const effectiveMinXO = Math.max(minXO, speakerRange.min);
+          const effectiveMaxXO = Math.min(maxXO, speakerRange.max);
+
+          // Warning if ranges don't fully overlap
+          if (speakerRange.min < minXO || speakerRange.max > maxXO) {
+            console.warn(`⚠️ ${cmdIds} slider range (${speakerRange.min}Hz - ${speakerRange.max}Hz) extends beyond subwoofer bandwidth (${minXO}Hz - ${maxXO}Hz)`);
+          }
+
+          // Filter freqIndex to only include frequencies within this speaker's range
+          const filteredFreqIndex = freqIndex.filter(freq =>
+            freq >= effectiveMinXO && freq <= effectiveMaxXO
+          );
+
+          console.log(`${cmdIds} filtered frequency range: ${filteredFreqIndex.length} frequencies from ${filteredFreqIndex[0] || 'none'} to ${filteredFreqIndex[filteredFreqIndex.length - 1] || 'none'}Hz`);
+
           // finalize xo that is closest match to target curve
           const initialXO = parseFloat(customCrossover[count]);
 
-          // **ADD THIS WARNING CHECK HERE**
+          // Warning checks for this speaker's effective range
           if (initialXO > effectiveMaxXO) {
             console.warn(`⚠️ ${cmdIds} initial XO (${initialXO}Hz) is above effective range (${effectiveMaxXO}Hz) - may not find optimal setting`);
           }
@@ -2764,16 +3075,17 @@
 
           let bestXO = initialXO, minRmsError = Infinity;
 
-          console.info("Starting...");
+          console.info(`Starting optimization for ${cmdIds}...`);
 
-          // Use filtered frequency range from slider
+          // Use filtered frequency range from appropriate slider
           for (let j = 0; j < filteredFreqIndex.length; j++) {
             let checkXO = filteredFreqIndex[j];
 
-            if (checkXO < Math.max(initialXO, effectiveMinXO) || checkXO > effectiveMaxXO) { continue; }
+            // FIXED: Remove initial XO from range check - slider range should be authoritative
+            if (checkXO < effectiveMinXO || checkXO > effectiveMaxXO) { continue; }
 
             // final XO determination logic
-            console.infoUpdate(`${cmdIds} - Initial XO: ${initialXO}hz → Checking XO: ${checkXO}hz`);
+            // console.infoUpdate(`${cmdIds} - Initial XO: ${initialXO}hz → Checking XO: ${checkXO}hz [(]${speakerRange.layer} layer]`);
 
             if (singleChannel) {
               await genSpeaker(i, checkXO);
@@ -2796,6 +3108,9 @@
               bestXO = checkXO;
             }
 
+            // final XO determination logic
+            console.infoUpdate(`${cmdIds} - Initial XO: ${initialXO}hz → Checking XO: ${checkXO}hz (RMS: ${rmsError.toFixed(3)}) [${speakerRange.layer} layer]`);
+
             for (let k = mCount + 3; k > mCount; k--) {
               await postDelete(k);
             }
@@ -2803,24 +3118,40 @@
 
           customCrossover[count] = bestXO;
 
-          // **ADD THIS - Store the result in RP22BestXO array**
-          RP22BestXO.push([commandId[count], bestXO.toString()]);
+          // Store the result in RP22BestXO array with layer information
+          RP22BestXO.push([commandId[count], bestXO.toString(), speakerRange.layer]);
 
           if (!singleChannel) {
             customCrossover[1 + count] = bestXO;
-            // **ADD THIS - Store the second channel result**
-            RP22BestXO.push([commandId[1 + count], bestXO.toString()]);
+            // Store the second channel result with layer information
+            const secondarySpeakerId = commandId[1 + count];
+            const secondaryLayer = getSpeakerLayer(secondarySpeakerId);
+            RP22BestXO.push([secondarySpeakerId, bestXO.toString(), secondaryLayer]);
             i += 2;
             count++;
           }
           count++;
-          console.infoUpdate(`${cmdIds} - Initial XO: ${initialXO}hz → Best XO: ${bestXO}hz (RMS: ${minRmsError.toFixed(3)})`);
+          console.infoUpdate(`${cmdIds} - Initial XO: ${initialXO}hz → Best XO: ${bestXO}hz (RMS: ${minRmsError.toFixed(3)}) [${speakerRange.layer} layer]`);
         }
 
-        // **ADD THIS - Log the final results and optionally return them**
-        console.log("Final RP22BestXO results:", RP22BestXO);
+        // Log the final results grouped by layer
+        const bedResults = RP22BestXO.filter(result => result[2] === 'BED');
+        const heightResults = RP22BestXO.filter(result => result[2] === 'HEIGHT');
+        const unknownResults = RP22BestXO.filter(result => result[2] === 'DEFAULT' || result[2] === 'UNKNOWN');
 
-        // **OPTIONAL - Return the array if you need to use it elsewhere**
+        console.log("=== FINAL CROSSOVER OPTIMIZATION RESULTS ===");
+        if (bedResults.length > 0) {
+          console.log("BED Layer speakers:", bedResults);
+        }
+        if (heightResults.length > 0) {
+          console.log("HEIGHT Layer speakers:", heightResults);
+        }
+        if (unknownResults.length > 0) {
+          console.log("Default/Unknown speakers:", unknownResults);
+        }
+
+        console.log("Complete RP22BestXO results:", RP22BestXO);
+
         return RP22BestXO;
       }
 
@@ -2828,19 +3159,24 @@
         let currSubIdx = nSpeakers + 1;
         let cmdIds = commandId[currSubIdx];
         let minDelay = 0, maxDelay = 0;
-        let startFreq = Math.round(await getLow3dBPoint(currSubIdx));
-        let endFreq = Math.round(await getHigh3dBPoint(currSubIdx));
+        // let startFreq = Math.round(await getLow3dBPoint(currSubIdx));
+        // let endFreq = Math.round(await getHigh3dBPoint(currSubIdx));
+        let startFreq = Math.round(await getAbsLow3dBPointForSub(currSubIdx));
+        let endFreq = Math.round(await getAbsHigh3dBPointForSub(currSubIdx));
         for (let i = nSpeakers + 2; i <= nSpeakers + nSubs; i++) {
           console.log(`Aligning ${commandId[i]} to ${cmdIds}...`);
-          startFreq = Math.min(startFreq, Math.round(await getLow3dBPoint(i)));
-          endFreq = Math.max(endFreq, Math.round(await getHigh3dBPoint(i)));
+          // startFreq = Math.min(startFreq, Math.round(await getLow3dBPoint(i)));
+          // endFreq = Math.max(endFreq, Math.round(await getHigh3dBPoint(i)));
+          startFreq = Math.min(startFreq, Math.round(await getAbsLow3dBPointForSub(i)));
+          endFreq = Math.max(endFreq, Math.round(await getAbsHigh3dBPointForSub(i)));
           const [isPossible, requiredDelay, isInverted, sumIndex] = await alignMsub(currSubIdx, i, startFreq, endFreq);
           if (!isPossible || !sumIndex) {
             console.error("Failed to align multiple subwoofers!");
             throw new Error;
           }
           currSubIdx = sumIndex;
-          mSec[i] += (requiredDelay / 1000);
+          // mSec[i] += (requiredDelay / 1000);
+          mSec[i] += (requiredDelay / delaymax);
           invertSub[i] = isInverted;
           cmdIds += ` & ${commandId[i]}`;
           minDelay = Math.min(minDelay, mSec[i]);
@@ -2857,7 +3193,8 @@
           mSec[i] -= IROffset;
         }
         // offset volume from combining subwoofers
-        const volAdjust = parseFloat(await getSubTrim(nChannels));
+        // const volAdjust = parseFloat(await getSubTrim(nChannels));
+        const volAdjust = await getSubTrim(nChannels);
         if (volAdjust === 0) { return; } // nothing more to do
         await postNext('Add SPL offset', nChannels, { offset: volAdjust });
         // newer AVRs that support directional already compensates for combined subwoofer volume and doesn't need adjustment
@@ -2909,22 +3246,24 @@
       }
 
       async function getTrim(idx, start, end) {
-        //await fetch_mREW();      
         const targetArray = response2array(targetResponse, start, end);
         const targetSPL = targetArray.reduce((acc, val) => acc + val, 0) / targetArray.length;
         let freqResponse;
         if (start == 200 && end == 2000 && isRP22mode == false) {
           freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
           console.info("getTrim: applying Default - 1/6 smoothing - assume speakers");
+
         } else if (start == 200 && end == 2000 && isRP22mode == true) {
           freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
           console.info("getTrim: applying CEDIA RP22 - 1/1 smoothing - assume speakers");
+
         } else if (start >= 500 && isRP22mode == true) {
           freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
           console.info("getTrim: applying CEDIA RP22 - 1/1 smoothing - assume speakers");
         } else if (start < 500 && isRP22mode == true) {
           freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
           console.info("getTrim: applying CEDIA RP22 - 1/3 smoothing - assume subwoofer(s)");
+
         } else {
           freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
           console.info("getTrim: applying Default - 1/6 smoothing");
@@ -2932,27 +3271,142 @@
         const freqArray = response2array(freqResponse, start, end);
         const freqSPL = freqArray.reduce((acc, val) => acc + val, 0) / freqArray.length;
 
-        // ADD THIS DEBUG CODE:
-        console.log(`*** TRIM DEBUG for measurement ${idx} (${start}-${end}Hz) ***`);
-        console.log(`Target curve average SPL: ${targetSPL.toFixed(1)}dB`);
-        console.log(`Measurement average SPL: ${freqSPL.toFixed(1)}dB`);
-        console.log(`Calculated trim: ${(targetSPL - freqSPL).toFixed(1)}dB`);
-
+        if (isDebugMode) {
+          // ADD THIS DEBUG CODE:
+          console.log(`*** TRIM DEBUG for measurement ${idx} (${start}-${end}Hz) ***`);
+          console.log(`Target curve average SPL: ${targetSPL.toFixed(1)}dB`);
+          console.log(`Measurement average SPL: ${freqSPL.toFixed(1)}dB`);
+          console.log(`Calculated trim: ${(targetSPL - freqSPL).toFixed(1)}dB`);
+          const measurements = await fetch_mREW();
+          const currentSplOffset = parseFloat(measurements[idx].splOffsetdB);
+          console.log(`Current measurement SPL offset: ${currentSplOffset}dB`);
+          console.log(`Effective measurement level: ${(freqSPL + currentSplOffset).toFixed(1)}dB`);
+        }
         const offset = targetSPL - freqSPL;
         return Math.round(offset * 2) / 2; // round to nearest 0.5
       }
 
       async function getSpeakerTrim(idx) {
-        return await getTrim(idx, 500, isRP22mode ? 16000 : 2000);
+        let mode = 'default';
+        if (isRP22mode) mode = 'RP22';
+        else if (isDolbymode) mode = 'DOLBY';
+        else if (isTHXmode) mode = 'THX';
+        else if (isIMAXmode) mode = 'IMAX';
+
+        // Measure actual speaker capabilities once
+        let actualLow = Math.round(await getAbsLow3dBPointForSpk(idx));
+        let actualHigh = Math.round(await getAbsHigh3dBPointForSpk(idx));
+
+        let param2, param3;
+        switch (mode) {
+          case 'RP22':
+            param2 = Math.max(actualLow, 20);
+            param3 = Math.min(actualHigh, 20000);
+            modeSpkMin = 20;
+            modeSpkMax = 20000;
+            break;
+
+          case 'DOLBY':
+            param2 = Math.max(actualLow, 31.5);  // ← Now consistent with subwoofer
+            param3 = Math.min(actualHigh, 16000);
+            modeSpkMin = 31.5;
+            modeSpkMax = 16000;
+            break;
+
+          case 'THX':
+            param2 = Math.max(actualLow, 20);
+            param3 = Math.min(actualHigh, 20000);
+            modeSpkMin = 20;
+            modeSpkMax = 20000;
+            break;
+
+          case 'IMAX':
+            param2 = Math.max(actualLow, 20);
+            param3 = Math.min(actualHigh, 20000);
+            modeSpkMin = 20;
+            modeSpkMax = 20000;
+            break;
+
+          default:
+            param2 = Math.max(actualLow, 20);
+            param3 = Math.min(actualHigh, 20000);
+            modeSpkMin = 20;
+            modeSpkMax = 20000;
+        }
+
+        return await getTrim(idx, param2, param3);
       }
 
       async function getSubTrim(idx) {
-        return await getTrim(idx, isRP22mode ? 20 : 30, isRP22mode ? 120 : 80);
+        let mode = 'default';
+        if (isRP22mode) mode = 'RP22';
+        else if (isDolbymode) mode = 'DOLBY';
+        else if (isTHXmode) mode = 'THX';
+        else if (isIMAXmode) mode = 'IMAX';
+
+        // Measure actual subwoofer capabilities
+        let actualLow = Math.round(await getAbsLow3dBPointForSub(idx));
+        let actualHigh = Math.round(await getAbsHigh3dBPointForSub(idx));
+
+        let param2, param3;
+        let warnings = [];
+
+        switch (mode) {
+          case 'RP22':
+            param2 = Math.max(actualLow, 20);
+            param3 = Math.min(actualHigh, 120);
+            // No warnings - RP22 adapts to actual performance
+            modeSubXOMin = 20;
+            modeSubXOMax = 120;
+            break;
+
+          case 'DOLBY':
+            param2 = Math.max(actualLow, 31.5);
+            param3 = Math.min(actualHigh, 120);
+            modeSubXOMin = 31.5;
+            modeSubXOMax = 120;
+            if (actualLow > 31.5) {
+              warnings.push(`Sub ${idx}: Low end ${actualLow}Hz exceeds Dolby spec (31.5Hz)`);
+            }
+            break;
+
+          case 'THX':
+            param2 = Math.max(actualLow, 20);
+            param3 = Math.min(actualHigh, 120);
+            modeSubXOMin = 20;
+            modeSubXOMax = 120;
+            if (actualLow > 20) {
+              warnings.push(`Sub ${idx}: Low end ${actualLow}Hz doesn't meet THX requirement (20Hz)`);
+            }
+            break;
+
+          case 'IMAX':
+            param2 = Math.max(actualLow, 20);
+            param3 = Math.min(actualHigh, 70);
+            modeSubXOMin = 20;
+            modeSubXOMax = 70;
+            if (actualHigh < 70) {
+              warnings.push(`Sub ${idx}: High end ${actualHigh}Hz below IMAX crossover (70Hz)`);
+            }
+            break;
+
+          default:
+            param2 = Math.max(actualLow, 30);
+            param3 = Math.min(actualHigh, 80);
+            modeSubXOMin = 30;
+            modeSubXOMax = 80;
+        }
+
+        // Log warnings for system diagnostics
+        if (warnings.length > 0) {
+          console.warn('Subwoofer compliance warnings:', warnings);
+        }
+        return await getTrim(idx, param2, param3);
       }
 
       async function getDynamicBassFill(idx) {
-        const startFreq = Math.round(await getLow3dBPoint(idx, 20, 120));
-        const endFreq = Math.round(await getHigh3dBPoint(idx, 20, 120));
+        const startFreq = Math.round(await getLow3dBPoint(idx, modeSubXOMin, modeSubXOMax));
+        const endFreq = Math.round(await getHigh3dBPoint(idx, modeSubXOMin, modeSubXOMax));
         const subFreqResponse = await fetchSafe('frequency-response?smoothing=1%2F6&ppo=96', idx);
         const subArray = response2array(subFreqResponse, startFreq, endFreq);
         const targetArray = response2array(targetResponse, startFreq, endFreq);
@@ -2972,20 +3426,17 @@
         for (let i = 0; i < indices.length; i++) {
           if (indices[i] === mlpIdx) { continue; }
           const idxVolume = measurements[indices[i]].title.startsWith("SW") ? await getSubTrim(indices[i]) : await getSpeakerTrim(indices[i]);
-          const volAdjust = parseFloat(idxVolume - mlpVolume);
+          // const volAdjust = parseFloat(idxVolume - mlpVolume);
+          const volAdjust = idxVolume - mlpVolume;
           await postNext('Add SPL offset', indices[i], { offset: volAdjust });
         }
       }
 
       async function align4system(ind1, ind2, xo) {
         const start = Math.round(xo / 2), end = Math.round(xo * 2);
-        // const [loDelay, hiDelay] = getDelayRangeOfFinalSub();
         let [loDelay, hiDelay] = getDelayRangeOfFinalSub();
-
-        // Clamp and fix signs
-        loDelay = Math.max(-1000, Math.min(0, -Math.abs(loDelay))); // force negative
-        hiDelay = Math.max(0, Math.min(1000, Math.abs(hiDelay)));   // force positive
-
+        loDelay = Math.max(-delaymax, Math.min(0, -Math.abs(loDelay))); // force negative
+        hiDelay = Math.max(0, Math.min(delaymax, Math.abs(hiDelay)));   // force positive
         console.info(`Available delay range: ${loDelay.toFixed(2)}ms <-> ${hiDelay.toFixed(2)}ms`);
         let isInverted = false, isPossible = false, requiredDelay = NaN, bestFreq = NaN, maxSum = -Infinity;
         await postSafe("http://localhost:4735/alignment-tool/index-a", ind1, "selected as measurement A");
@@ -2997,9 +3448,9 @@
         console.info("Starting...")
 
         for (let checkFreq = 20; checkFreq <= 250; checkFreq++) {
-          const bestDelayStr = isNaN(requiredDelay) ? "N/A" : requiredDelay.toFixed(2);
-          const bestFreqStr = isNaN(bestFreq) ? "N/A" : bestFreq;
-          console.infoUpdate(`Checking: @${checkFreq}Hz, Best: ${bestDelayStr}ms @${bestFreqStr}hz Inverted: ${isInverted}`);
+          // const bestDelayStr = isNaN(requiredDelay) ? "N/A" : requiredDelay.toFixed(2);
+          // const bestFreqStr = isNaN(bestFreq) ? "N/A" : bestFreq;
+          // console.infoUpdate(`Checking: @${checkFreq}Hz, Best: ${bestDelayStr}ms @${bestFreqStr}hz Inverted: ${isInverted}`);
 
           const postAlignResult = await postAlign('Align IRs', checkFreq);
           if (postAlignResult.message === 'Delay too large') { continue; }
@@ -3018,6 +3469,11 @@
             requiredDelay = delayB;
             isInverted = invertB;
           }
+
+          const bestDelayStr = isNaN(requiredDelay) ? "N/A" : requiredDelay.toFixed(2);
+          const bestFreqStr = isNaN(bestFreq) ? "N/A" : bestFreq;
+          console.infoUpdate(`Checking: @${checkFreq}Hz, Best: ${bestDelayStr}ms @${bestFreqStr}hz Inverted: ${isInverted}`);
+
         }
 
         if (isPossible) {
@@ -3049,10 +3505,6 @@
         console.info("Starting...")
 
         for (let checkFreq = 20; checkFreq <= 250; checkFreq++) {
-          const bestDelayStr = isNaN(requiredDelay) ? "N/A" : requiredDelay.toFixed(2);
-          const bestFreqStr = isNaN(bestFreq) ? "N/A" : bestFreq;
-          console.infoUpdate(`Checking: @${checkFreq}Hz, Best: ${bestDelayStr}ms @${bestFreqStr}hz Inverted: ${isInverted}`);
-
           const postAlignResult = await postAlign('Align IRs', checkFreq);
           if (postAlignResult.message === 'Delay too large' && previousDelay != postAlignResult.delay) {
             previousDelay = postAlignResult.delay;
@@ -3073,6 +3525,10 @@
             requiredDelay = delayB;
             isInverted = invertB;
           }
+
+          const bestDelayStr = isNaN(requiredDelay) ? "N/A" : requiredDelay.toFixed(2);
+          const bestFreqStr = isNaN(bestFreq) ? "N/A" : bestFreq;
+          console.infoUpdate(`Checking: @${checkFreq}Hz, Best: ${bestDelayStr}ms @${bestFreqStr}hz Inverted: ${isInverted}`);
         }
 
         if (isPossible) {
@@ -3136,15 +3592,15 @@
           const isLarge = customCrossover[i] === "L";
           let finalResponseName = commandId[i] + "final";
           /*finalResponseName += (commandId[i] === "C" && RP22DialogEnhancementFilter) ? "-ADE" : "";*/
-          finalResponseName += (commandId[i] === "C" && AdvancedFiltersType === "DIALOGadvanced") ? "-ADF" : "";
-          finalResponseName += (AdvancedFiltersType === "HLOSSresearch") ? "-AHF" : "";
-          finalResponseName += (AdvancedFiltersType === "HLOSSmoderate") ? "-AHF" : "";
-          finalResponseName += (AdvancedFiltersType === "HLOSSsevere") ? "-AHF" : "";
-          finalResponseName += (AdvancedFiltersType === "HLOSSoriginal") ? "-AHF" : "";
-          finalResponseName += (AdvancedFiltersType === "GAMINGcompetitive") ? "-AGF" : "";
-          finalResponseName += (AdvancedFiltersType === "GAMINGimmersive") ? "-AGF" : "";
-          finalResponseName += (AdvancedFiltersType === "GAMINGvoice") ? "-AGF" : "";
-          finalResponseName += (AdvancedFiltersType === "GAMINGbalanced") ? "-AGF" : "";
+          finalResponseName += (commandId[i] === "C" && AdvancedFilters && AdvancedFiltersType === "DIALOGadvanced") ? "-ADF" : "";
+          finalResponseName += (AdvancedFilters && AdvancedFiltersType === "HLOSSresearch") ? "-AHF" : "";
+          finalResponseName += (AdvancedFilters && AdvancedFiltersType === "HLOSSmoderate") ? "-AHF" : "";
+          finalResponseName += (AdvancedFilters && AdvancedFiltersType === "HLOSSsevere") ? "-AHF" : "";
+          finalResponseName += (AdvancedFilters && AdvancedFiltersType === "HLOSSoriginal") ? "-AHF" : "";
+          finalResponseName += (AdvancedFilters && AdvancedFiltersType === "GAMINGcompetitive") ? "-AGF" : "";
+          finalResponseName += (AdvancedFilters && AdvancedFiltersType === "GAMINGimmersive") ? "-AGF" : "";
+          finalResponseName += (AdvancedFilters && AdvancedFiltersType === "GAMINGvoice") ? "-AGF" : "";
+          finalResponseName += (AdvancedFilters && AdvancedFiltersType === "GAMINGbalanced") ? "-AGF" : "";
           finalResponseName += isLarge ? "-Large" : `-${customCrossover[i]}hz-xo`;
           const eqSpeaker = nChannels + 2 * i;
           const spWithHPF = await genSpeaker(eqSpeaker, customCrossover[i]);
@@ -3190,143 +3646,52 @@
       }
 
       async function updateAdy() {
-        // ISO 226:2023 MATLAB reference values
-        const iso226Data = {
-          frequencies: [20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500],
-          alphaF: [0.532, 0.506, 0.480, 0.455, 0.432, 0.409, 0.387, 0.367, 0.349, 0.330, 0.315, 0.301, 0.288, 0.276, 0.267, 0.259, 0.253, 0.250, 0.246, 0.244, 0.243, 0.243, 0.243, 0.242, 0.242, 0.245, 0.254, 0.271, 0.301],
-          LU: [-31.6, -27.2, -23.0, -19.1, -15.9, -13.0, -10.3, -8.1, -6.2, -4.5, -3.1, -2.0, -1.1, -0.4, 0.0, 0.3, 0.5, 0.0, -2.7, -4.1, -1.0, 1.7, 2.5, 1.2, -2.1, -7.1, -11.2, -10.7, -3.1],
-          Tf: [78.5, 68.7, 59.5, 51.1, 44.0, 37.5, 31.5, 26.5, 22.1, 17.9, 14.4, 11.4, 8.6, 6.2, 4.4, 3.0, 2.2, 2.4, 3.5, 1.7, -1.3, -4.2, -6.0, -5.4, -1.5, 6.0, 12.6, 13.9, 12.3]
-        };
+        console.log("Starting ADY file processing...");
 
-        // Helper function to get ISO 226 parameters for any frequency
-        function getISO226Params(frequency) {
-          const frequencies = iso226Data.frequencies;
-          let closest = frequencies[0];
-          let minDiff = Math.abs(frequency - closest);
-          let closestIndex = 0;
+        // Initialize estimatedPlaybackLevels array
+        // const estimatedPlaybackLevels = [];
 
-          for (let i = 0; i < frequencies.length; i++) {
-            const diff = Math.abs(frequency - frequencies[i]);
-            if (diff < minDiff) {
-              minDiff = diff;
-              closest = frequencies[i];
-              closestIndex = i;
-            }
-          }
-
-          return {
-            frequency: closest,
-            alphaF: iso226Data.alphaF[closestIndex],
-            LU: iso226Data.LU[closestIndex],
-            Tf: iso226Data.Tf[closestIndex]
-          };
-        }
-
-        // Estimate playback level based on frequency response
-        function estimatePlaybackLevel(dataView, referenceLevel = 75) {
+        // Helper function to estimate playback level for speakers (500-2000 Hz)
+        function estimatePlaybackLevelSpeakers(dataView) {
           let avgSensitivity = 0;
           let count = 0;
 
-          // Sample 800-1200 Hz region (~1kHz reference) - with bounds checking
+          // Sample 500-2000 Hz region - with bounds checking
           const maxSafeIndex = Math.floor(dataView.byteLength / 4) - 1;
-          for (let k = 800; k <= 1200; k++) {
+          for (let k = 500; k <= 2000; k++) {
             if (k <= maxSafeIndex) {
               avgSensitivity += dataView.getFloat32(k * 4);
               count++;
             }
           }
           avgSensitivity = count > 0 ? avgSensitivity / count : 0;
-
-          const baselineLevel = Math.round(referenceLevel * 2) / 2; // Round to 0.5dB steps
-          const estimatedLevel = baselineLevel + avgSensitivity - 5; // Room factor
-
-          // Clamp to reasonable range
-          return Math.max(40, Math.min(90, estimatedLevel));
+          const estimatedLevel = targetLevel + avgSensitivity;
+          return estimatedLevel;
         }
 
-        // Get level-dependent compensation factor based on ISO 226 curves
-        function getLevelCompensationFactor(frequency, playbackLevel) {
-          // Equal-loudness contours flatten at higher levels
-          const levelFactors = {
-            40: { lowFreq: 2.5, midFreq: 1.0, highFreq: 1.8 },   // Low level - more compensation
-            70: { lowFreq: 1.5, midFreq: 1.0, highFreq: 1.2 },   // Medium level
-            90: { lowFreq: 1.1, midFreq: 1.0, highFreq: 1.05 }   // High level - minimal compensation
-          };
+        // Helper function to estimate playback level for subwoofers (30-80 Hz)
+        function estimatePlaybackLevelSubwoofer(dataView) {
+          let avgSensitivity = 0;
+          let count = 0;
 
-          // Interpolate between levels
-          let factor = { lowFreq: 1.0, midFreq: 1.0, highFreq: 1.0 };
-          if (playbackLevel <= 40) {
-            factor = levelFactors[40];
-          } else if (playbackLevel <= 70) {
-            const ratio = (playbackLevel - 40) / 30;
-            const low = levelFactors[40];
-            const mid = levelFactors[70];
-            factor = {
-              lowFreq: low.lowFreq + ratio * (mid.lowFreq - low.lowFreq),
-              midFreq: low.midFreq + ratio * (mid.midFreq - low.midFreq),
-              highFreq: low.highFreq + ratio * (mid.highFreq - low.highFreq)
-            };
-          } else {
-            const ratio = Math.min(1.0, (playbackLevel - 70) / 20);
-            const mid = levelFactors[70];
-            const high = levelFactors[90];
-            factor = {
-              lowFreq: mid.lowFreq + ratio * (high.lowFreq - mid.lowFreq),
-              midFreq: mid.midFreq + ratio * (high.midFreq - mid.midFreq),
-              highFreq: mid.highFreq + ratio * (high.highFreq - mid.highFreq)
-            };
+          // Sample 30-80 Hz region - with bounds checking
+          const maxSafeIndex = Math.floor(dataView.byteLength / 4) - 1;
+          for (let k = lowFreq; k <= highFreq; k++) {
+            if (k <= maxSafeIndex) {
+              avgSensitivity += dataView.getFloat32(k * 4);
+              count++;
+            }
           }
-
-          // Apply frequency-specific factor
-          if (frequency < 500) return factor.lowFreq;
-          if (frequency > 8000) return factor.highFreq;
-          return factor.midFreq;
+          avgSensitivity = count > 0 ? avgSensitivity / count : 0;
+          const estimatedLevel = targetLevel + avgSensitivity;
+          return estimatedLevel;
         }
-
-        // Convert SPL to loudness level (phons) using ISO 226:2023
-        function splToPhons(frequency, splLevel) {
-          // Input validation
-          if (splLevel > 120 || splLevel < 0) {
-            console.warn(`Unrealistic SPL input: ${splLevel.toFixed(1)}dB at ${frequency}Hz - clamping to valid range`);
-            splLevel = Math.max(0, Math.min(120, splLevel));
-          }
-
-          const params = getISO226Params(frequency);
-          const { alphaF, LU, Tf } = params;
-
-          // At 1000Hz, phons equal dB SPL (reference point)
-          if (frequency >= 950 && frequency <= 1050) {
-            return splLevel;
-          }
-
-          // Calculate frequency-dependent loudness correction
-          const thresholdCorrection = Tf / 10;
-          const transferCorrection = LU / 10;
-
-          // Level-dependent factor
-          const levelFactor = Math.pow(splLevel / 80, alphaF - 0.3);
-
-          // Combine corrections
-          const basePhons = splLevel - thresholdCorrection + transferCorrection;
-          const adjustedPhons = basePhons * levelFactor;
-
-          // Apply final correction for perceptual accuracy
-          const finalPhons = adjustedPhons + (splLevel - 75) * 0.1;
-
-          // Clamp to realistic range
-          return Math.max(20, Math.min(90, finalPhons));
-        }
-
-        // Original processing with ISO 226:2023 enhancements
-        console.log("Applying ISO 226:2023 equal loudness compensation...");
 
         for (let i = 1; i <= nSpeakers; i++) {
           if (customCrossover[i] === "L") { continue; };
           if (customCrossover[i] > 90) { customCrossover[i] /= 10; }
         }
-
         const jsonData = JSON.parse(adyContents);
-
         if (bassMode === "Directional") {
           let ii = 54;
           for (let i = nChannels - 1; i < jsonData.detectedChannels.length; i++) {
@@ -3338,12 +3703,10 @@
             if (swChannel.customTargetCurvePoints && (i != (nChannels - 1))) { delete swChannel.customTargetCurvePoints };
           }
         }
-
         jsonData.dynamicVolume = false;
         jsonData.lfc = false;
         jsonData.dynamicEq = (targetCurveName === "");
         jsonData.enTargetCurveType = 1;
-
         jsonData.detectedChannels.forEach((channel, index) => {
           const responseData = channel.responseData;
           const zerosArray = Array(16383).fill("0");
@@ -3369,7 +3732,9 @@
 
         const octave = Math.pow(2, 1 / 96);
 
-        // Enhanced speaker processing with ISO 226:2023
+        // Enhanced speaker processing with logging
+        console.log("Processing main speakers...");
+
         for (let i = 1; i <= nSpeakers; i++) {
           const fltArray = [];
           const fltResponse = await fetchSafe('frequency-response?smoothing=1%2F48&ppo=96', 2 * i + (nChannels - 1));
@@ -3377,96 +3742,23 @@
           const buffer = bytes.buffer;
           const data = new DataView(buffer);
 
-          // Check DataView bounds
-          const maxSafeIndex = Math.floor(data.byteLength / 4) - 1;
-          const actualLoopLimit = Math.min(1531, maxSafeIndex);
+          // Estimate playback level and store in array (500-2000 Hz for speakers)
+          const estimatedLevel = estimatePlaybackLevelSpeakers(data);
+          console.log(`Speaker ${commandId[i]}: Estimated playback level ${estimatedLevel.toFixed(1)}dB`);
 
-          // Check if current level is already close to AVR limits
-          let iso226Compensation = 0;
+          // Store speaker ID and estimated level
+          estimatedPlaybackLevels.push([commandId[i], estimatedLevel.toFixed(1)]);
 
-          if (customLevel[i] >= 11 || customLevel[i] <= -11) {
-            console.log(`Speaker ${commandId[i]}: Current level (${customLevel[i].toFixed(1)}dB) is close to AVR limits. Skipping ISO 226:2023 processing.`);
-            iso226Compensation = 0;
-          } else {
-            // Estimate playback level for ISO 226:2023 processing
-            const estimatedLevel = estimatePlaybackLevel(data);
-            console.log(`Speaker ${commandId[i]}: Estimated playback level ${estimatedLevel.toFixed(1)}dB`);
-
-            // SAVE TO ARRAY - Store speaker ID and estimated level
-            estimatedPlaybackLevels.push([commandId[i], estimatedLevel.toFixed(1)]);
-
-            // ISO 226:2023 weighted compensation calculation
-            let weightedSum = 0;
-            let totalWeight = 0;
-            let freq = fltResponse.startFreq;
-
-            for (let k = 0; k <= actualLoopLimit; k++) {
-              if (k * 4 + 3 >= data.byteLength) {
-                console.warn(`Reached DataView boundary at k=${k} for speaker ${commandId[i]}`);
-                break;
-              }
-
-              const fltMagnitude = data.getFloat32(k * 4);
-
-              // Apply ISO 226:2023 weighting for psychoacoustic analysis (500Hz to 8kHz)
-              if (freq >= 500 && freq <= 8000) {
-                const iso226Params = getISO226Params(freq);
-                const levelFactor = getLevelCompensationFactor(freq, estimatedLevel);
-
-                // Higher sensitivity (lower αf) = higher weight for loudness calculation
-                const psychoacousticWeight = (1 / iso226Params.alphaF) * levelFactor;
-
-                const magnitudeContribution = fltMagnitude + antiHFRolloff[k];
-                weightedSum += magnitudeContribution * psychoacousticWeight;
-                totalWeight += psychoacousticWeight;
-              }
-
-              freq *= octave;
-            }
-
-            // Calculate ISO 226:2023 compensation
-            iso226Compensation = totalWeight > 0 ? weightedSum / totalWeight : 0;
-            iso226Compensation = Math.round(iso226Compensation * 2) / 2; // Round to 0.5dB
-
-            console.log(`Speaker ${commandId[i]}: ISO 226:2023 compensation = ${iso226Compensation.toFixed(1)}dB`);
-          }
-
-          // Build frequency array for all frequencies regardless of ISO processing
           let freq = fltResponse.startFreq;
-          for (let k = 0; k <= actualLoopLimit; k++) {
-            if (k * 4 + 3 >= data.byteLength) {
-              break;
-            }
+          for (let k = 0; k <= 1531; k++) {
             const fltMagnitude = data.getFloat32(k * 4);
             fltArray.push([freq, fltMagnitude + antiHFRolloff[k]]);
             freq *= octave;
           }
 
-          // Store original level for logging
+          // Store original values for logging
           const originalLevel = customLevel[i];
-
-          // Apply compensation to custom level
-          customLevel[i] += iso226Compensation;
-
-          // Validation and AVR limits (-12dB to +12dB)
-          let wasLimited = false;
-          if (customLevel[i] < -12) {
-            console.warn(`Speaker ${commandId[i]}: Total level after compensation (${originalLevel.toFixed(1)}dB + ${iso226Compensation.toFixed(1)}dB = ${(originalLevel + iso226Compensation).toFixed(1)}dB) exceeds minimum AVR limit. Clamping to -12dB`);
-            customLevel[i] = -12;
-            wasLimited = true;
-          } else if (customLevel[i] > 12) {
-            console.warn(`Speaker ${commandId[i]}: Total level after compensation (${originalLevel.toFixed(1)}dB + ${iso226Compensation.toFixed(1)}dB = ${(originalLevel + iso226Compensation).toFixed(1)}dB) exceeds maximum AVR limit. Clamping to +12dB`);
-            customLevel[i] = 12;
-            wasLimited = true;
-          }
-
-          if (Math.abs(iso226Compensation) > 8) {
-            console.warn(`Speaker ${commandId[i]}: Large compensation (${iso226Compensation}dB) suggests measurement issues`);
-          }
-
-          if (wasLimited) {
-            console.warn(`Speaker ${commandId[i]} could not be fully compensated due to AVR limits!`);
-          }
+          const finalLevel = customLevel[i];
 
           const customTargetCurvePoints = fltArray.map(point => `{${point[0]}, ${point[1]}}`);
           const thisChannel = jsonData.detectedChannels.find(channel => channel.commandId === commandId[i]);
@@ -3478,102 +3770,54 @@
           thisChannel.customCrossover = customCrossover[i] === "L" ? "F" : String(customCrossover[i]);
           thisChannel.customSpeakerType = customCrossover[i] === "L" ? "L" : "S";
           thisChannel.channelReport.customEnSpeakerConnect = customCrossover[i] === "L" ? 2 : 1;
+
+          // Enhanced logging
+          console.warn(`Speaker ${commandId[i]}: FINAL TRIM VALUES: ${finalLevel.toFixed(1)}dB`);
+          console.warn(`Speaker ${commandId[i]}: Distance: ${customDistance[i]}m, Crossover: ${thisChannel.customCrossover}, Type: ${thisChannel.customSpeakerType}`);
         }
 
-        // Enhanced subwoofer processing with ISO 226:2023
+        // Enhanced subwoofer processing with logging
         if (!noSub) {
+          console.log("Processing subwoofer(s)...");
+
           const subArray = [];
           const subResponse = await fetchSafe('frequency-response?smoothing=1%2F48&ppo=96', nChannels * 3 - 1);
           const bytesSub = Uint8Array.from(atob(subResponse.magnitude), c => c.charCodeAt(0));
           const bufferSub = bytesSub.buffer;
           const dataSub = new DataView(bufferSub);
 
-          // Check subwoofer DataView bounds
-          const maxSubIndex = Math.floor(dataSub.byteLength / 4) - 1;
-          const actualSubLimit = Math.min(1531, maxSubIndex);
+          // Estimate subwoofer playback level and store in array (30-80 Hz for subwoofers)
+          const subEstimatedLevel = estimatePlaybackLevelSubwoofer(dataSub);
+          console.log(`Subwoofer: Estimated playback level ${subEstimatedLevel.toFixed(1)}dB`);
+          estimatedPlaybackLevels.push(["Subwoofer", subEstimatedLevel.toFixed(1)]);
 
-          // Check subwoofer levels before ISO processing
-          let subISO226Compensation = 0;
-
-          // Get the base subwoofer level to check
-          const baseSubLevel = parseFloat(customLevel[nChannels]) || 0;
-
-          if (baseSubLevel >= 11 || baseSubLevel <= -11) {
-            console.log(`Subwoofer: Current level (${baseSubLevel.toFixed(1)}dB) is close to AVR limits. Skipping ISO 226:2023 processing.`);
-            subISO226Compensation = 0;
-          } else {
-            // Estimate subwoofer level
-            const subEstimatedLevel = estimatePlaybackLevel(dataSub, 70); // Subs typically run hotter
-            console.log(`Subwoofer: Estimated playback level ${subEstimatedLevel.toFixed(1)}dB`);
-
-            // SAVE TO ARRAY - Store subwoofer estimated level
-            estimatedPlaybackLevels.push(["Subwoofer", subEstimatedLevel.toFixed(1)]);
-
-            let subWeightedSum = 0;
-            let subTotalWeight = 0;
-
-            let freq = subResponse.startFreq;
-            for (let k = 0; k <= actualSubLimit; k++) {
-              if (k * 4 + 3 >= dataSub.byteLength) {
-                console.warn(`Reached subwoofer DataView boundary at k=${k}`);
-                break;
-              }
-
-              const subMagnitude = dataSub.getFloat32(k * 4);
-
-              // Apply ISO 226:2023 weighting for subwoofer range (20Hz to 250Hz)
-              if (freq >= 20 && freq <= 250) {
-                const iso226Params = getISO226Params(freq);
-                const levelFactor = getLevelCompensationFactor(freq, subEstimatedLevel);
-                const psychoacousticWeight = (1 / iso226Params.alphaF) * levelFactor;
-
-                const magnitudeContribution = subMagnitude;
-                subWeightedSum += magnitudeContribution * psychoacousticWeight;
-                subTotalWeight += psychoacousticWeight;
-              }
-
-              freq *= octave;
-            }
-
-            // Calculate ISO 226:2023 subwoofer compensation
-            subISO226Compensation = subTotalWeight > 0 ? subWeightedSum / subTotalWeight : 0;
-            subISO226Compensation = Math.round(subISO226Compensation * 2) / 2;
-
-            console.log(`Subwoofer: ISO 226:2023 compensation = ${subISO226Compensation.toFixed(1)}dB`);
-          }
-
-          // Build subwoofer frequency array regardless of ISO processing
           let freq = subResponse.startFreq;
-          for (let k = 0; k <= actualSubLimit; k++) {
-            if (k * 4 + 3 >= dataSub.byteLength) {
-              break;
-            }
+          for (let k = 0; k <= 1531; k++) {
             const subMagnitude = dataSub.getFloat32(k * 4);
             subArray.push([freq, subMagnitude]);
             freq *= octave;
           }
-
           const customTargetCurvePointsSub = subArray.map(point => `{${point[0]}, ${point[1]}}`);
           const subChannel = jsonData.detectedChannels[nChannels - 1];
           subChannel.customTargetCurvePoints = customTargetCurvePointsSub;
-
           let k = 0;
           for (let channel of jsonData.detectedChannels) {
             if (channel.commandId.startsWith("SW")) {
               const customDistanceValue = parseFloat(customDistance[nChannels + k]) - parseFloat(channel.delayAdjustment);
-              let customLevelValue = parseFloat(customLevel[nChannels + k]) + parseFloat(channel.trimAdjustment);
-
-              // Apply ISO 226:2023 compensation
-              customLevelValue += subISO226Compensation;
+              const originalSubLevel = parseFloat(customLevel[nChannels + k]) + parseFloat(channel.trimAdjustment);
+              let customLevelValue = originalSubLevel;
 
               channel.customDistance = Math.round(parseFloat(customDistanceValue) * 100) / 100;
               channel.customLevel = customLevelValue.toFixed(1);
               channel.frequencyRangeRolloff = 250;
 
+              // Enhanced subwoofer logging
+              console.warn(`${channel.commandId}: FINAL TRIM VALUES: ${customLevelValue.toFixed(1)}dB`);
+              console.warn(`${channel.commandId}: Distance: ${channel.customDistance}m`);
+
               if (bassMode === "Directional") { k++ };
             }
           }
-
           if (bassMode === "Directional") {
             jsonData.subwooferLayout = "N/A";
             sOs === 343 ? jsonData.subwooferMode = "Standard" : jsonData.subwooferMode = "N/A";
@@ -3587,13 +3831,11 @@
           console.log(`${index}: Speaker ${item[0]} = ${item[1]}dB`);
         });
 
-        // Generate file with ISO 226:2023 enhancement
         const ady = JSON.stringify(jsonData);
         const blob = new Blob([ady], { type: 'application/json' });
         const urlBlob = URL.createObjectURL(blob);
         var downloadLink = document.createElement("a");
         downloadLink.href = urlBlob;
-
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -3603,7 +3845,6 @@
         const timestamp = `${year}-${month}${day}-${hours}${minutes}`;
         const tcName = targetCurveName === "" ? "DEQ" : targetCurveName;
         downloadLink.download = getadyName(fileName, "_"
-          //  + (RP22DialogEnhancementFilter ? "ADE_" : "")
           + (AdvancedFiltersType === "DIALOGadvanced" ? "ADF_" : "")
           + (AdvancedFiltersType === "HLOSSresearch" ? "AHF_" : "")
           + (AdvancedFiltersType === "HLOSSmoderate" ? "AHF_" : "")
@@ -3613,16 +3854,14 @@
           + (AdvancedFiltersType === "GAMINGimmersive" ? "AGF_" : "")
           + (AdvancedFiltersType === "GAMINGvoice" ? "AGF_" : "")
           + (AdvancedFiltersType === "GAMINGbalanced" ? "AGF_" : "")
-          //  + swInvMsg + `${tcName}_ISO226_ClariQNext_${timestamp}.ady`);
-          // + (AdvancedFiltersType ? "AHE_" : "")
-          + swInvMsg + `${tcName}_ISO226_`
-          + `ClariQNext_${timestamp}.ady`);
+          + swInvMsg + `${tcName}_ClariQNext_${timestamp}.ady`);
         downloadLink.style.display = "none";
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
 
-        console.log("ISO 226:2023 equal loudness compensation applied successfully!");
+        console.log("Processing completed successfully!");
+        console.log(`ADY file generated: ${downloadLink.download}`);
 
         // RETURN THE ARRAY IF NEEDED
         return estimatedPlaybackLevels;
@@ -4134,46 +4373,269 @@
       }
 
       function normalizeTrimLevels() {
-        console.log("Checking for systematic measurement offset...");
+        console.log("Normalizing trim levels to industry standard (75dB reference)...");
 
-        // Calculate average speaker trim (excluding subs)
-        const speakerTrims = customLevel.slice(1, nSpeakers + 1);
-        const avgSpeakerTrim = speakerTrims.reduce((sum, trim) => sum + trim, 0) / speakerTrims.length;
+        // Calculate target level offset from industry standard
+        const standardReference = 75.0; // Industry standard SPL reference
+        const targetOffset = targetLevel - standardReference;
 
-        console.log(`Average speaker trim: ${avgSpeakerTrim.toFixed(1)}dB`);
+        console.log(`Target level: ${targetLevel}dB, Standard reference: ${standardReference}dB`);
+        console.log(`Target level offset: ${targetOffset.toFixed(1)}dB`);
 
-        // If average trim is excessive (beyond ±15dB), normalize it
-        const EXCESSIVE_THRESHOLD = 15;
+        if (Math.abs(targetOffset) > 0.5) {
+          console.log(`Converting trims from ${targetLevel}dB target to ${standardReference}dB standard...`);
+        } else {
+          console.log("Target level matches standard reference - no conversion needed.");
+        }
 
-        if (Math.abs(avgSpeakerTrim) > EXCESSIVE_THRESHOLD) {
-          console.warn(`Detected systematic measurement offset of ${avgSpeakerTrim.toFixed(1)}dB - normalizing...`);
+        // Calculate original trim statistics
+        const totalChannels = noSub ? nSpeakers : nSpeakers + nSubs;
+        const originalTrims = [...customLevel]; // Store copy of original values
 
-          // Subtract the average from all speaker trims and round to 0.5dB steps
-          for (let i = 1; i <= nSpeakers; i++) {
-            customLevel[i] -= avgSpeakerTrim;
-            customLevel[i] = Math.round(customLevel[i] * 2) / 2; // Round to nearest 0.5dB
-          }
-
-          // Also normalize subwoofer trims if present
-          if (!noSub) {
-            for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
-              customLevel[i] -= avgSpeakerTrim;
-              customLevel[i] = Math.round(customLevel[i] * 2) / 2; // Round to nearest 0.5dB
-            }
-          }
-
-          console.info(`All trims normalized by ${avgSpeakerTrim.toFixed(1)}dB`);
-          console.info("This offset represents a systematic measurement calibration difference.");
-          console.info("Individual speaker balance is preserved while bringing levels into reasonable range.");
-
-          // Log the normalized results
-          console.log("Normalized trim values:");
-          for (let i = 1; i <= nSpeakers + nSubs; i++) {
+        // Log original values
+        console.log("Original trim values (relative to current target):");
+        console.log("--- SPEAKERS ---");
+        for (let i = 1; i <= nSpeakers; i++) {
+          console.log(`${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
+        }
+        if (!noSub) {
+          console.log("--- SUBWOOFERS ---");
+          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
             console.log(`${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
           }
-        } else {
-          console.info("Trim levels are within normal range - no normalization needed.");
         }
+
+        // Apply target level correction to all channels
+        for (let i = 1; i <= nSpeakers; i++) {
+          customLevel[i] -= targetOffset;
+          customLevel[i] = Math.round(customLevel[i] * 2) / 2; // Round to nearest 0.5dB
+        }
+
+        if (!noSub) {
+          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+            customLevel[i] -= targetOffset;
+            customLevel[i] = Math.round(customLevel[i] * 2) / 2; // Round to nearest 0.5dB
+          }
+        }
+
+        if (Math.abs(targetOffset) > 0.5) {
+          console.log(`Applied ${targetOffset.toFixed(1)}dB correction to normalize to 75dB standard.`);
+        }
+
+        // Log the BEFORE → AFTER comparison
+        console.log("BEFORE → AFTER comparison (normalized to 75dB standard):");
+        console.log("--- SPEAKERS ---");
+        for (let i = 1; i <= nSpeakers; i++) {
+          const change = customLevel[i] - originalTrims[i];
+          console.log(`${commandId[i]}: ${originalTrims[i].toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB (${change >= 0 ? '+' : ''}${change.toFixed(1)}dB)`);
+        }
+        if (!noSub) {
+          console.log("--- SUBWOOFERS ---");
+          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+            const change = customLevel[i] - originalTrims[i];
+            console.log(`${commandId[i]}: ${originalTrims[i].toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB (${change >= 0 ? '+' : ''}${change.toFixed(1)}dB)`);
+          }
+        }
+
+        // Final analysis relative to 75dB standard
+        const normalizedTrims = customLevel.slice(1, totalChannels + 1);
+        const maxTrim = Math.max(...normalizedTrims);
+        const minTrim = Math.min(...normalizedTrims);
+        const averageTrim = normalizedTrims.reduce((sum, trim) => sum + trim, 0) / normalizedTrims.length;
+
+        console.log(`✓ Normalized trim range: ${minTrim.toFixed(1)}dB to ${maxTrim.toFixed(1)}dB`);
+        console.log(`✓ Average trim: ${averageTrim.toFixed(1)}dB (relative to 75dB standard)`);
+
+        // Check against industry recommendations
+        const recommendedTrims = normalizedTrims.filter(trim => Math.abs(trim) <= 10);
+        const excessiveTrims = normalizedTrims.filter(trim => Math.abs(trim) > 10);
+
+        if (excessiveTrims.length === 0) {
+          console.info("✓ All trim levels within ±10dB recommended range");
+        } else {
+          console.warn(`${excessiveTrims.length} channels exceed ±10dB recommended range - consider speaker/room adjustments`);
+        }
+
+        // Check hardware limits
+        const withinLimits = normalizedTrims.filter(trim => trim >= -12 && trim <= 12);
+        if (withinLimits.length === normalizedTrims.length) {
+          console.info("✓ All trim levels within ±12dB hardware limits");
+        } else {
+          console.error(`${normalizedTrims.length - withinLimits.length} channels exceed ±12dB hardware limits`);
+        }
+
+        // Headroom analysis
+        const positiveTrims = normalizedTrims.filter(trim => trim > 0);
+        if (positiveTrims.length > 0) {
+          const maxPositive = Math.max(...positiveTrims);
+          console.log(`📊 Headroom impact: ${positiveTrims.length} channels with positive trims (max: ${maxPositive.toFixed(1)}dB)`);
+          console.log(`📊 Reference level achieved at Master Volume ${-maxPositive.toFixed(1)}dB`);
+        } else {
+          console.info("✓ No positive trims - maximum headroom preserved");
+        }
+      }
+
+      // Not used anymore, but leave it for now!
+      function normalizeAdyTrimValues() {
+        console.log("Optimizing ADY trim values for best AVR performance...");
+
+        // Target ranges: Speakers ±6dB (half AVR range), Subs -12dB to +6dB (full flexibility)
+        const SPEAKER_MIN = -6.0;
+        const SPEAKER_MAX = +6.0;
+        const SUB_MIN = -12.0;
+        const SUB_MAX = +6.0;
+
+        // Find current ranges
+        const speakerTrims = customLevel.slice(1, nSpeakers + 1);
+        const minSpeaker = Math.min(...speakerTrims);
+        const maxSpeaker = Math.max(...speakerTrims);
+
+        let minSub = 0, maxSub = 0;
+        if (!noSub) {
+          const subTrims = customLevel.slice(nSpeakers + 1, nSpeakers + nSubs + 1);
+          minSub = Math.min(...subTrims);
+          maxSub = Math.max(...subTrims);
+        }
+
+        console.log(`Current ranges: Speakers ${minSpeaker.toFixed(1)}dB to ${maxSpeaker.toFixed(1)}dB`);
+        if (!noSub) {
+          console.log(`Current ranges: Subs ${minSub.toFixed(1)}dB to ${maxSub.toFixed(1)}dB`);
+        }
+        console.log(`Target ranges: Speakers ${SPEAKER_MIN.toFixed(1)}dB to ${SPEAKER_MAX.toFixed(1)}dB, Subs ${SUB_MIN.toFixed(1)}dB to ${SUB_MAX.toFixed(1)}dB`);
+
+        // Check if optimization needed
+        const speakersOK = (minSpeaker >= SPEAKER_MIN && maxSpeaker <= SPEAKER_MAX);
+        const subsOK = noSub || (minSub >= SUB_MIN && maxSub <= SUB_MAX);
+
+        if (speakersOK && subsOK) {
+          console.log("✓ All trims already within target ranges");
+
+          // Bonus optimization: If sub is below -5dB and we have speaker headroom, optimize sub level
+          if (!noSub) {
+            const currentSubMax = Math.max(...customLevel.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
+            const SUB_OPTIMAL = -5.0; // Optimal upper range for subs per research
+
+            if (currentSubMax < SUB_OPTIMAL) {
+              const bonusOffset = SUB_OPTIMAL - currentSubMax;
+              const newSpeakerMax = maxSpeaker + bonusOffset;
+
+              if (newSpeakerMax <= SPEAKER_MAX) {
+                console.log(`🚀 Bonus optimization: Sub at ${currentSubMax.toFixed(1)}dB, can shift +${bonusOffset.toFixed(1)}dB to reach optimal -5dB`);
+                console.log(`   Speakers would become: ${(minSpeaker + bonusOffset).toFixed(1)}dB to ${newSpeakerMax.toFixed(1)}dB (still within ±6dB)`);
+                offset = bonusOffset;
+              } else {
+                console.log(`💡 Sub could be optimized to -5dB but would push speakers beyond +6dB limit`);
+                console.log("✓ No optimization needed - current ranges are good");
+                return;
+              }
+            } else {
+              console.log("✓ No optimization needed - current ranges are good");
+              return;
+            }
+          } else {
+            console.log("✓ No optimization needed - current ranges are good");
+            return;
+          }
+        }
+
+        // Calculate required offset for speakers that are out of range
+        if (maxSpeaker > SPEAKER_MAX) {
+          offset = SPEAKER_MAX - maxSpeaker;
+          console.log(`Speaker max ${maxSpeaker.toFixed(1)}dB > ${SPEAKER_MAX.toFixed(1)}dB: need ${offset.toFixed(1)}dB shift`);
+        } else if (minSpeaker < SPEAKER_MIN) {
+          offset = SPEAKER_MIN - minSpeaker;
+          console.log(`Speaker min ${minSpeaker.toFixed(1)}dB < ${SPEAKER_MIN.toFixed(1)}dB: need ${offset.toFixed(1)}dB shift`);
+        }
+
+        // Check if offset causes sub problems
+        if (!noSub && Math.abs(offset) > 0.1) {
+          const newMinSub = minSub + offset;
+          const newMaxSub = maxSub + offset;
+
+          if (newMinSub < SUB_MIN) {
+            const adjustment = SUB_MIN - newMinSub;
+            offset += adjustment;
+            console.log(`Adjusted offset to ${offset.toFixed(1)}dB to keep subs above ${SUB_MIN.toFixed(1)}dB`);
+          }
+
+          if (newMaxSub > SUB_MAX) {
+            const adjustment = SUB_MAX - newMaxSub;
+            offset += adjustment;
+            console.log(`Adjusted offset to ${offset.toFixed(1)}dB to keep subs below ${SUB_MAX.toFixed(1)}dB`);
+          }
+        }
+
+        if (Math.abs(offset) < 0.1) {
+          console.log("✓ No significant offset needed");
+          return;
+        }
+
+        // Log before values
+        console.log("BEFORE optimization:");
+        console.log("--- SPEAKERS ---");
+        for (let i = 1; i <= nSpeakers; i++) {
+          console.log(`${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
+        }
+        if (!noSub) {
+          console.log("--- SUBWOOFERS ---");
+          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+            console.log(`${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
+          }
+        }
+
+        // Store originals
+        const originalLevels = [...customLevel];
+
+        // Apply offset
+        console.log(`Applying ${offset.toFixed(1)}dB offset to all channels...`);
+
+        for (let i = 1; i <= nSpeakers; i++) {
+          customLevel[i] += offset;
+          customLevel[i] = Math.round(customLevel[i] * 2) / 2; // Round to 0.5dB
+        }
+
+        if (!noSub) {
+          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+            customLevel[i] += offset;
+            customLevel[i] = Math.round(customLevel[i] * 2) / 2; // Round to 0.5dB
+          }
+        }
+
+        // Log after values
+        console.log("AFTER optimization:");
+        console.log("--- SPEAKERS ---");
+        for (let i = 1; i <= nSpeakers; i++) {
+          const inRange = customLevel[i] >= SPEAKER_MIN && customLevel[i] <= SPEAKER_MAX ? "✓" : "⚠️";
+          console.log(`${commandId[i]}: ${originalLevels[i].toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB ${inRange}`);
+        }
+        if (!noSub) {
+          console.log("--- SUBWOOFERS ---");
+          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+            const inRange = customLevel[i] >= SUB_MIN && customLevel[i] <= SUB_MAX ? "✓" : "⚠️";
+            console.log(`${commandId[i]}: ${originalLevels[i].toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB ${inRange}`);
+          }
+        }
+
+        // Master volume adjustment guidance
+        if (Math.abs(offset) >= 0.5) {
+          const masterAdjust = -offset; // Opposite of trim shift
+          console.log(`📢 Master Volume: Increase by ${masterAdjust.toFixed(1)}dB to maintain same loudness`);
+          console.log(`   📊 Relative Scale: -25dB → ${(-25 + masterAdjust).toFixed(1)}dB`);
+          console.log(`   📊 Absolute Scale: 55 → ${(55 + masterAdjust).toFixed(0)} (80 = 0dB reference)`);
+        }
+
+        // Final summary
+        const finalSpeakerMin = Math.min(...customLevel.slice(1, nSpeakers + 1));
+        const finalSpeakerMax = Math.max(...customLevel.slice(1, nSpeakers + 1));
+        console.log(`✓ Final speaker range: ${finalSpeakerMin.toFixed(1)}dB to ${finalSpeakerMax.toFixed(1)}dB`);
+
+        if (!noSub) {
+          const finalSubMin = Math.min(...customLevel.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
+          const finalSubMax = Math.max(...customLevel.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
+          console.log(`✓ Final sub range: ${finalSubMin.toFixed(1)}dB to ${finalSubMax.toFixed(1)}dB`);
+        }
+
+        console.log("✓ Optimization complete - relative balance preserved");
       }
 
       // CEDIA Assessment - Enhanced Implementation with Professional Standards and Advanced Acoustics
@@ -4612,8 +5074,10 @@
           const stdDev = this.calculateStandardDeviation(delays);
 
           // Convert from seconds to milliseconds for evaluation
-          const spreadMs = Math.abs(delaySpread) * 1000;
-          const stdDevMs = stdDev * 1000;
+          // const spreadMs = Math.abs(delaySpread) * 1000;
+          // const stdDevMs = stdDev * 1000;
+          const spreadMs = Math.abs(delaySpread) * delaymax;
+          const stdDevMs = stdDev * delaymax;
 
           if (spreadMs <= 0.1 && stdDevMs <= 0.05) return 'Excellent';
           if (spreadMs <= 0.5 && stdDevMs <= 0.2) return 'Good';
@@ -5618,7 +6082,8 @@
             // Enhanced timing data reporting
             if (systemData.mSec && systemData.mSec.delays) {
               console.log(`├─ Timing analysis: ${systemData.mSec.count} speaker delays analyzed`);
-              console.log(`├─ Delay spread: ${(systemData.mSec.delaySpread * 1000).toFixed(2)}ms (σ=${(systemData.mSec.stdDeviation * 1000).toFixed(2)}ms)`);
+              // console.log(`├─ Delay spread: ${(systemData.mSec.delaySpread * 1000).toFixed(2)}ms (σ=${(systemData.mSec.stdDeviation * 1000).toFixed(2)}ms)`);
+              console.log(`├─ Delay spread: ${(systemData.mSec.delaySpread * delaymax).toFixed(2)}ms (σ=${(systemData.mSec.stdDeviation * delaymax).toFixed(2)}ms)`);
               console.log(`├─ Timing consistency: ${systemData.mSec.timingConsistency}`);
               console.log(`├─ Early reflection est: ${systemData.mSec.earlyReflectionMetric}dB`);
             }
@@ -6205,8 +6670,205 @@
           originalMethods.error.apply(console, args);
         };
       }
+
+      // Working PDF solution using pure jsPDF
+      function saveLogAsPDF() {
+        const logContainer = document.getElementById("logContainer");
+        if (!logContainer) {
+          console.log("No log container found!");
+          return;
+        }
+
+        // Extract all text content
+        const logEntries = logContainer.querySelectorAll('.log, .warning, .info');
+        const logData = [];
+
+        logEntries.forEach(entry => {
+          let text = entry.textContent || entry.innerText;
+
+          // Debug: Check what classes each entry has
+          console.log(`Entry classes: ${entry.className}, text preview: ${text.substring(0, 30)}...`);
+
+          // Clean up emojis and special characters that jsPDF can't handle
+          text = text
+            .replace(/👆/g, '[CURSOR]')
+            .replace(/🔥/g, '[RESET]')
+            .replace(/📊/g, '[DATA]')
+            .replace(/🎛️/g, '[SLIDER]')
+            .replace(/🔧/g, '[TOOL]')
+            .replace(/✅/g, '[OK]')
+            .replace(/🚀/g, '[AUTO]')
+            .replace(/🔒/g, '[LOCK]')
+            .replace(/🔓/g, '[UNLOCK]')
+            .replace(/🎉/g, '[COMPLETE]')
+            .replace(/🎯/g, '[TARGET]')
+            .replace(/🎬/g, '[CINEMA]')
+            .replace(/🤖/g, '[AUTO]')
+            .replace(/⚠️/g, '[WARNING]')
+            .replace(/🔶/g, '[NOTICE]')
+            .replace(/📘/g, '[INFO]')
+            .replace(/🔄/g, '[REFRESH]')
+            .replace(/👤/g, '[USER]')
+            .replace(/🏆/g, '[SCORE]')
+            .replace(/📚/g, '[NOTES]')
+            .replace(/📋/g, '[LIST]')
+            .replace(/❌/g, '[X]')
+            .replace(/🔍/g, '[SEARCH]')
+            .replace(/📈/g, '[CHART]')
+            .replace(/⭐/g, '[STAR]')
+            .replace(/💡/g, '[IDEA]')
+            .replace(/🎵/g, '[MUSIC]')
+            .replace(/🔊/g, '[AUDIO]')
+            .replace(/🎤/g, '[MIC]')
+            .replace(/🎧/g, '[HEADPHONES]')
+            .replace(/🚫/g, '[BLOCKED]')
+            .replace(/├─/g, '--')
+            .replace(/\n/g, '')
+            .replace(/→/g, '->')
+            .replace(/└─/g, '__')
+            .replace(/🔬/g, '@')
+            .replace(/✓/g, '[OK]')
+            // Remove any remaining emojis/special unicode characters
+            .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '[?]')
+            // Clean up any problematic characters
+            .replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '?');
+
+          let prefix = "";
+          let color = [0, 0, 0]; // black
+
+          if (entry.classList.contains('warning')) {
+            prefix = "[WARNING] ";
+            color = [204, 102, 0]; // orange
+          } else if (entry.classList.contains('info')) {
+            prefix = "[INFO] ";
+            color = [0, 102, 204]; // blue
+          } else {
+            prefix = "";
+            color = [0, 0, 0]; // black
+          }
+
+          logData.push({
+            text: prefix + text,
+            color: color
+          });
+        });
+
+        console.log(`Found ${logData.length} log entries to export`);
+
+        // Create PDF with jsPDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        // PDF settings
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 15;
+        const maxLineWidth = pageWidth - (margin * 2);
+        const lineHeight = 4;
+        let yPosition = 20;
+
+        // Add title
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${nextversion} Log`, margin, yPosition);
+        yPosition += 10;
+
+        // Add timestamp
+        const now = new Date();
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Generated: ${now.toLocaleString()}`, margin, yPosition);
+        yPosition += 10;
+
+        // Add separator line
+        doc.setDrawColor(0, 0, 0);
+        doc.line(margin, yPosition, pageWidth - margin, yPosition);
+        yPosition += 8;
+
+        // Add log content
+        doc.setFontSize(8);
+        doc.setFont('courier', 'normal');
+
+        logData.forEach((entry, index) => {
+          // Check if we need a new page
+          if (yPosition > pageHeight - 20) {
+            doc.addPage();
+            yPosition = margin;
+          }
+
+          // Set color for this entry
+          doc.setTextColor(entry.color[0], entry.color[1], entry.color[2]);
+
+          // Debug: Log color being applied (only for first few entries to avoid spam)
+          if (index < 5) {
+            console.log(`Entry ${index}: Color [${entry.color.join(', ')}] for text: ${entry.text.substring(0, 50)}...`);
+          }
+
+          // Split long lines to fit page width, but respect word boundaries
+          const lines = doc.splitTextToSize(entry.text, maxLineWidth);
+
+          lines.forEach(line => {
+            if (yPosition > pageHeight - 20) {
+              doc.addPage();
+              yPosition = margin;
+              // Reapply color after new page
+              doc.setTextColor(entry.color[0], entry.color[1], entry.color[2]);
+            }
+            doc.text(line, margin, yPosition);
+            yPosition += lineHeight;
+          });
+
+          // Add small spacing between log entries for readability
+          yPosition += 1;
+        });
+
+        // Generate filename with timestamp
+        const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+
+        // Save the PDF
+        doc.save(`${nextversion} Log ${timestamp}.pdf`);
+        console.log("PDF saved successfully using jsPDF!");
+      }
+
+      // Ultimate simple test
+      function testJsPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text('Hello World', 20, 20);
+        doc.save('test.pdf');
+      }
+
+      // PDF solution using pure jsPDF
+      function debugLogClasses() {
+        const logContainer = document.getElementById("logContainer");
+        const allEntries = logContainer.querySelectorAll('*');
+
+        console.log(`Total elements in log: ${allEntries.length}`);
+
+        allEntries.forEach((entry, index) => {
+          if (entry.className) {
+            console.log(`Element ${index}: class="${entry.className}", text="${entry.textContent.substring(0, 50)}..."`);
+          }
+        });
+
+        // Check specifically for warning/info classes
+        const warnings = logContainer.querySelectorAll('.warning');
+        const infos = logContainer.querySelectorAll('.info');
+        const logs = logContainer.querySelectorAll('.log');
+
+        console.log(`Found: ${warnings.length} warnings, ${infos.length} info entries, ${logs.length} regular logs`);
+      }
+
       // Initialize the console logger
       initializeConsoleLogger();
+
+      // PDF solution using pure jsPDF
+      // console.log(typeof jsPDF); // Should output "function"
+      // console.log(window.jspdf); // Should show an object
     </script>
 </body>
 

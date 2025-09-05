@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.6 - 30-08-2025 @ 21:05
+// ClariQ Next 0.0.7 - 05-09-2025 @ 14:58
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -76,9 +76,12 @@ window.AppCalibration.cleanup = {
 	},
 };
 
-// Global slider variables (keep original structure)
-let sliderInstance = null;
-window.AppCalibration.sliderInstance = null;
+// Global slider variables - Updated to support multiple sliders
+let sliderInstances = {
+	bed: null,
+	height: null,
+};
+window.AppCalibration.sliderInstances = sliderInstances;
 
 // Dark mode initialization will use existing global isDarkMode variable
 
@@ -234,6 +237,11 @@ document.addEventListener("DOMContentLoaded", function () {
 	let finalizeXOCompleted = false;
 	let drawResultsCompleted = false;
 	let updateAdyCompleted = false;
+	// ClearCurve
+	let generateSpeakerCurvesCompleted = false;
+	let generateSubwooferCurvesCompleted = false;
+	let generateAVGCurvesCompleted = false;
+	let finalizeRoomCurveCompleted = false;
 
 	// Initialize skill tags (keep original logic)
 	const selectedSkills = new Set();
@@ -249,92 +257,378 @@ document.addEventListener("DOMContentLoaded", function () {
 		});
 	});
 
-	// Function to show/hide slider container (keep original)
+	// 2. SLIDER CONTAINER VISIBILITY FIX
 	function toggleSliderVisibility(show) {
-		const sliderContainer = document.querySelector(".slider-container");
-		if (sliderContainer) {
+		const bedSliderContainer = document.querySelector(".slider-container.bed-layer");
+		const heightSliderContainer = document.querySelector(".slider-container.height-layer");
+
+		// Always handle BED layer slider
+		if (bedSliderContainer) {
 			if (show) {
-				sliderContainer.style.display = "block";
-				console.log("📊 Slider container shown");
+				bedSliderContainer.style.display = "block";
+				// Add debugging to ensure container is visible
+				console.log("BED layer slider container shown - display:", bedSliderContainer.style.display);
+				console.log("BED layer container dimensions:", bedSliderContainer.offsetWidth, "x", bedSliderContainer.offsetHeight);
 			} else {
-				sliderContainer.style.display = "none";
-				console.log("📊 Slider container hidden");
+				bedSliderContainer.style.display = "none";
+				console.log("BED layer slider container hidden");
 			}
+		} else {
+			console.error("❌ BED layer slider container (.slider-container.bed-layer) not found in DOM!");
+		}
+
+		// Only show HEIGHT layer slider if hasHeightChannel is true
+		if (heightSliderContainer) {
+			const showHeightSlider = show && typeof hasHeightChannel !== "undefined" && hasHeightChannel === true;
+
+			if (showHeightSlider) {
+				heightSliderContainer.style.display = "block";
+				console.log("HEIGHT layer slider container shown");
+			} else {
+				heightSliderContainer.style.display = "none";
+				if (show && (typeof hasHeightChannel === "undefined" || hasHeightChannel === false)) {
+					console.log("HEIGHT layer slider container hidden - no height channels");
+				} else {
+					console.log("HEIGHT layer slider container hidden");
+				}
+			}
+		} else if (typeof hasHeightChannel !== "undefined" && hasHeightChannel === true) {
+			console.error("❌ HEIGHT layer slider container (.slider-container.height-layer) not found in DOM but hasHeightChannel=true!");
 		}
 	}
 
-	// Function to get filtered frequency array (keep original logic)
-	function getFilteredFrequencies() {
+	function getFilteredFrequencies(layer = "bed") {
 		if (typeof freqIndex === "undefined" || !freqIndex || freqIndex.length === 0) {
-			console.warn("⚠️ freqIndex not available for filtering");
+			console.warn(`⚠️ freqIndex not available for filtering (${layer} layer)`);
 			return [];
 		}
 
+		// RP22 mode - different filtering for bed vs height
 		if (typeof isRP22mode !== "undefined" && isRP22mode) {
-			const frequenciesToRemove = [40, 60, 180, 200, 250];
-			const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
-			console.log(`🎛️ Cedia RP22 mode: Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
-			return filteredFreqs;
+			if (layer === "bed") {
+				const frequenciesToRemove = [40, 60, 200, 250];
+				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
+				console.log(`🎛️ Cedia RP22 mode (BED): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
+				return filteredFreqs;
+			} else if (layer === "height") {
+				// For height channels in RP22 mode, maybe different filtering or same
+				const frequenciesToRemove = [40, 60, 200, 250]; // Could be different for heights
+				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
+				console.log(`🎛️ Cedia RP22 mode (HEIGHT): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
+				return filteredFreqs;
+			}
 		}
 
-		return freqIndex;
+		// THX mode - potentially different frequencies for bed vs height
+		if (typeof isTHXmode !== "undefined" && isTHXmode) {
+			if (layer === "bed") {
+				console.log(`🎛️ THX mode (BED): Keeping only frequency 80`);
+				return [80];
+			} else if (layer === "height") {
+				// Heights might use different frequency in THX mode
+				/*
+				console.log(`🎛️ THX mode (HEIGHT): Keeping only frequency 80`);
+				return [80, 90, 100, 110, 120, 150, 200]; // Or could be different like [100] for heights
+				*/
+				// For height channels in RP22 mode, maybe different filtering or same
+				const frequenciesToRemove = [20, 40, 60, 70, 200, 250]; // Could be different for heights
+				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
+				console.log(`🎛️ THX mode (HEIGHT): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
+				return filteredFreqs;
+			}
+		}
+
+		// IMAX mode - potentially different frequencies for bed vs height
+		if (typeof isIMAXmode !== "undefined" && isIMAXmode) {
+			if (layer === "bed") {
+				console.log(`🎛️ IMAX mode (BED): Keeping only frequency 70`);
+				return [70];
+			} else if (layer === "height") {
+				// Heights might use different frequency in IMAX mode
+				/*
+				console.log(`🎛️ IMAX mode (HEIGHT): Keeping only frequency 70`);
+				return [70, 80, 90, 100, 110, 120, 150, 200]; // Or could be different like [80] for heights
+				*/
+				const frequenciesToRemove = [20, 40, 60, 200, 250]; // Could be different for heights
+				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
+				console.log(`🎛️ IMAX mode (HEIGHT): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
+				return filteredFreqs;
+			}
+		}
+
+		// ClearCurve mode - different frequency sets for bed vs height
+		if (typeof isClearCurve !== "undefined" && isClearCurve) {
+			if (layer === "bed") {
+				// BED layer frequencies - typically lower frequencies for main speakers
+				const bedFilteredFreqs = [20, 40, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 220, 240, 250, 260, 272, 282, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460, 480, 500];
+				const originalLength = typeof mergefreqIndex !== "undefined" ? mergefreqIndex.length : freqIndex.length;
+				console.log(`🎛️ ClearCurve MODE (BED): Using ${bedFilteredFreqs.length} bed-layer frequencies`);
+				return bedFilteredFreqs;
+			} else if (layer === "height") {
+				// HEIGHT layer frequencies - typically higher frequencies for height speakers
+				const heightFilteredFreqs = [20, 40, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 220, 240, 250, 260, 272, 282, 280, 300, 320, 340, 360, 380, 400, 420, 440, 460, 480, 500];
+				console.log(`🎛️ ClearCurve MODE (HEIGHT): Using ${heightFilteredFreqs.length} height-layer frequencies`);
+				return heightFilteredFreqs;
+			}
+		}
+
+		// Default behavior - different base frequencies for bed vs height
+		if (layer === "bed") {
+			if (typeof isClearCurve !== "undefined" && isClearCurve === false) {
+				console.log(`🎛️ Standard mode (BED): Using full freqIndex`);
+				return freqIndex;
+			} else {
+				console.log(`🎛️ Standard mode (BED): Using mergefreqIndex`);
+				return typeof mergefreqIndex !== "undefined" ? mergefreqIndex : freqIndex;
+			}
+		} else if (layer === "height") {
+			if (typeof isClearCurve !== "undefined" && isClearCurve === false) {
+				// For height channels, might want to filter out very low frequencies
+				// const heightFreqs = freqIndex.filter((freq) => freq >= 60); // Heights typically don't go as low
+				// console.log(`🎛️ Standard mode (HEIGHT): Using filtered freqIndex (≥60Hz)`);
+				console.log(`🎛️ Standard mode (HEIGHT): : Using full freqIndex`);
+				// return heightFreqs;
+				return freqIndex;
+			} else {
+				console.log(`🎛️ Standard mode (HEIGHT): Using mergefreqIndex`);
+				return typeof mergefreqIndex !== "undefined" ? mergefreqIndex : freqIndex;
+			}
+		}
+
+		// Fallback to original behavior
+		console.warn(`⚠️ Unknown layer '${layer}', using default frequencies`);
+		return typeof isClearCurve !== "undefined" && isClearCurve ? (typeof mergefreqIndex !== "undefined" ? mergefreqIndex : freqIndex) : freqIndex;
 	}
 
-	// Function to initialize the slider (keep original but enhance)
-	function initializeSlider() {
-		const filteredFreqs = getFilteredFrequencies();
+	// 3. ENHANCED SLIDER INITIALIZATION WITH BETTER ERROR HANDLING
+	function initializeSliders() {
+		// Check if we have height channels
+		const hasHeights = typeof hasHeightChannel !== "undefined" && hasHeightChannel === true;
 
-		if (filteredFreqs.length > 0) {
-			const sliderContainer = document.querySelector(".slider-container");
-			if (sliderContainer && !sliderInstance) {
-				console.log("🎛️ Initializing frequency range slider...");
-				sliderInstance = new RangeSlider(sliderContainer, filteredFreqs);
-				window.AppCalibration.sliderInstance = sliderInstance;
+		// Get filtered frequencies for each layer
+		const bedFilteredFreqs = getFilteredFrequencies("bed");
+		const heightFilteredFreqs = hasHeights ? getFilteredFrequencies("height") : [];
 
-				let previousRange = sliderInstance.getSelectedRange();
-				const checkForChanges = () => {
-					if (sliderInstance) {
-						const currentRange = sliderInstance.getSelectedRange();
-						if (JSON.stringify(currentRange) !== JSON.stringify(previousRange)) {
-							previousRange = currentRange;
-						}
+		console.log("🔧 Initializing sliders...");
+		console.log("   - ClearCurve mode:", typeof isClearCurve !== "undefined" ? isClearCurve : "undefined");
+		console.log("   - BED frequencies:", bedFilteredFreqs.length);
+		console.log("   - HEIGHT frequencies:", heightFilteredFreqs.length);
+		console.log("   - Has heights:", hasHeights);
+
+		if (bedFilteredFreqs.length > 0 || heightFilteredFreqs.length > 0) {
+			const useSingleMode = typeof isClearCurve !== "undefined" && isClearCurve;
+			console.log("   - Single mode:", useSingleMode);
+
+			// Always initialize BED layer slider
+			const bedSliderContainer = document.querySelector(".slider-container.bed-layer");
+			if (bedSliderContainer) {
+				console.log("✅ Found BED slider container");
+
+				if (!sliderInstances.bed && bedFilteredFreqs.length > 0) {
+					console.log(`Initializing BED layer slider with ${bedFilteredFreqs.length} frequencies...`);
+
+					try {
+						sliderInstances.bed = new RangeSlider(bedSliderContainer, bedFilteredFreqs, useSingleMode, "bed");
+						window.AppCalibration.sliderInstances.bed = sliderInstances.bed;
+						console.log("✅ BED layer slider initialized successfully");
+					} catch (error) {
+						console.error("❌ Failed to initialize BED slider:", error);
 					}
-				};
+				} else if (sliderInstances.bed) {
+					console.log("BED slider already exists");
+				} else {
+					console.warn("No BED frequencies available");
+				}
+			} else {
+				console.error("❌ BED slider container (.slider-container.bed-layer) not found!");
+				// Log all available containers for debugging
+				const allContainers = document.querySelectorAll(".slider-container");
+				console.log(
+					"Available slider containers:",
+					Array.from(allContainers).map((c) => c.className),
+				);
+			}
 
-				const intervalId = setInterval(checkForChanges, 100);
-				window.AppCalibration.cleanup.addInterval(intervalId);
-				console.log("✅ Slider initialized successfully");
+			// Only initialize HEIGHT layer slider if hasHeightChannel is true
+			const heightSliderContainer = document.querySelector(".slider-container.height-layer");
+			if (heightSliderContainer && !sliderInstances.height && heightFilteredFreqs.length > 0 && hasHeights) {
+				console.log(`Initializing HEIGHT layer slider with ${heightFilteredFreqs.length} frequencies...`);
+
+				try {
+					sliderInstances.height = new RangeSlider(heightSliderContainer, heightFilteredFreqs, useSingleMode, "height");
+					window.AppCalibration.sliderInstances.height = sliderInstances.height;
+					console.log("✅ HEIGHT layer slider initialized successfully");
+				} catch (error) {
+					console.error("❌ Failed to initialize HEIGHT slider:", error);
+				}
+			} else if (!hasHeights) {
+				console.log("Skipping HEIGHT layer slider - hasHeightChannel = false");
+			}
+
+			// Set up monitoring for available sliders
+			let previousBedRange = sliderInstances.bed ? sliderInstances.bed.getSelectedRange() : null;
+			let previousHeightRange = sliderInstances.height ? sliderInstances.height.getSelectedRange() : null;
+
+			const checkForChanges = () => {
+				// Check BED layer changes
+				if (sliderInstances.bed) {
+					const currentBedRange = sliderInstances.bed.getSelectedRange();
+					if (JSON.stringify(currentBedRange) !== JSON.stringify(previousBedRange)) {
+						previousBedRange = currentBedRange;
+						handleSliderChange("bed", currentBedRange);
+					}
+				}
+
+				// Check HEIGHT layer changes (only if height slider exists)
+				if (sliderInstances.height) {
+					const currentHeightRange = sliderInstances.height.getSelectedRange();
+					if (JSON.stringify(currentHeightRange) !== JSON.stringify(previousHeightRange)) {
+						previousHeightRange = currentHeightRange;
+						handleSliderChange("height", currentHeightRange);
+					}
+				}
+			};
+
+			const intervalId = setInterval(checkForChanges, 100);
+			window.AppCalibration.cleanup.addInterval(intervalId);
+
+			if (useSingleMode) {
+				console.log("Single handle mode enabled for ClearCurve on available sliders");
+			}
+
+			console.log(`Frequency distribution - BED: ${bedFilteredFreqs.length} freqs${hasHeights ? `, HEIGHT: ${heightFilteredFreqs.length} freqs` : " (HEIGHT: disabled)"}`);
+		} else {
+			console.warn("Cannot initialize sliders: no valid frequency data for any layer");
+		}
+	}
+
+	// Function to handle slider value changes
+	function handleSliderChange(layerType, currentRange) {
+		console.log(`🎛️ ${layerType.toUpperCase()} layer slider changed:`, currentRange);
+
+		if (currentRange.mode === "single") {
+			// Store the selected frequency for the specific layer
+			if (layerType === "bed") {
+				window.selectedFrequencyBed = currentRange.value;
+			} else if (layerType === "height") {
+				window.selectedFrequencyHeight = currentRange.value;
+			}
+
+			// ClearCurve mode updates for specific layer
+			if (typeof isClearCurve !== "undefined" && isClearCurve) {
+				if (layerType === "bed") {
+					// Update BED layer frequencies
+					mergeFrequencyF = currentRange.value;
+					mergeFrequencyC = currentRange.value;
+					mergeFrequencySur = currentRange.value;
+					mergeFrequencySurB = currentRange.value;
+					mergeFrequencySurBS = currentRange.value;
+				} else if (layerType === "height") {
+					// Update HEIGHT layer frequencies
+					mergeFrequencyFW = currentRange.value;
+					mergeFrequencyFH = currentRange.value;
+					mergeFrequencySH = currentRange.value;
+					mergeFrequencyRH = currentRange.value;
+					mergeFrequencyTF = currentRange.value;
+					mergeFrequencyTM = currentRange.value;
+					mergeFrequencyTR = currentRange.value;
+				}
 			}
 		} else {
-			console.warn("⚠️ Cannot initialize slider: no valid frequency data");
+			// Store the range for the specific layer
+			if (layerType === "bed") {
+				window.selectedMinFreqBed = currentRange.min;
+				window.selectedMaxFreqBed = currentRange.max;
+			} else if (layerType === "height") {
+				window.selectedMinFreqHeight = currentRange.min;
+				window.selectedMaxFreqHeight = currentRange.max;
+			}
 		}
 	}
 
-	// Function to reset slider (keep original)
-	function resetSlider() {
-		sliderInstance = null;
-		window.AppCalibration.sliderInstance = null;
+	// Function to reset sliders - Updated for multiple sliders
+	function resetSliders() {
+		sliderInstances.bed = null;
+		sliderInstances.height = null;
+		window.AppCalibration.sliderInstances = sliderInstances;
 		toggleSliderVisibility(false);
-		console.log("🔥 Slider reset");
+		console.log("🔥 All sliders reset");
 	}
 
-	// Function to handle successful measurements import (keep original)
+	// 4. FIX FOR MEASUREMENTS IMPORT CALLBACK
 	function onMeasurementsImported() {
 		measurementsImported = true;
 		window.measurementsImported = true;
+
+		console.log("📊 Measurements imported - showing sliders");
 		toggleSliderVisibility(true);
 
+		// Add a longer delay and verify DOM state
 		setTimeout(() => {
-			initializeSlider();
-		}, 100);
+			console.log("🔧 Attempting to initialize sliders...");
+
+			// Verify the containers exist before trying to initialize
+			const bedContainer = document.querySelector(".slider-container.bed-layer");
+			const heightContainer = document.querySelector(".slider-container.height-layer");
+
+			console.log("DOM check - BED container:", !!bedContainer);
+			console.log("DOM check - HEIGHT container:", !!heightContainer);
+
+			if (bedContainer) {
+				console.log("BED container visible:", bedContainer.style.display !== "none");
+			}
+
+			initializeSliders();
+		}, 200); // Increased delay
 
 		updateContinueButtonState();
-		console.log("✅ Measurements imported successfully, slider is now available");
+		console.log("✅ Measurements imported successfully, sliders should now be available");
 
-		if (typeof isRP22mode !== "undefined" && isRP22mode) {
-			console.log("📊 Cedia RP22 mode active - frequencies 40,60,180,200,250 will be filtered out");
-		} else {
-			console.log("📊 Standard mode active - all frequencies available");
+		// Rest of the function remains the same...
+		const bmsElement = document.getElementById("BMs");
+		const adyfElement = document.getElementById("adyf");
+
+		if (bmsElement) {
+			bmsElement.style.display = "none";
+			console.log("🔒 BMs element hidden");
+		}
+
+		if (adyfElement) {
+			adyfElement.style.display = "none";
+			console.log("🔒 adyf element hidden");
+		}
+
+		// Enable cinema type radio buttons...
+		const radioButtons = document.querySelectorAll('input[name="cinema_type"]');
+		radioButtons.forEach((radio) => {
+			if (radio.id === "radio_imax_cinema") {
+				if (supportsIMAX === false) {
+					const imaxContainer = radio.closest(".col-md-4");
+					if (imaxContainer) {
+						imaxContainer.style.display = "none";
+						console.log("🚫 IMAX mode hidden - not supported");
+					}
+					radio.disabled = true;
+				} else {
+					const imaxContainer = radio.closest(".col-md-4");
+					if (imaxContainer) {
+						imaxContainer.style.display = "block";
+						console.log("✅ IMAX mode shown - supported");
+					}
+					radio.disabled = false;
+				}
+			} else {
+				radio.disabled = false;
+			}
+		});
+		console.log("📘 Cinema type radio buttons enabled");
+
+		setupCinemaTypeListeners();
+
+		const warningElement = document.getElementById("unlock_cinema_modes");
+		if (warningElement) {
+			warningElement.textContent = "✅ Measurements imported successfully! Cinema modes are now available.";
+			warningElement.className = "success";
 		}
 	}
 
@@ -445,7 +739,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 							measurementsImported = false;
 							window.measurementsImported = false;
-							resetSlider();
+							// resetSlider();
+							resetSliders();
 
 							console.log("Processing .ady file:", file.name);
 							try {
@@ -489,7 +784,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 				measurementsImported = false;
 				window.measurementsImported = false;
-				resetSlider();
+				// resetSlider();
+				resetSliders();
 
 				try {
 					if (typeof extractAdy === "function") {
@@ -529,22 +825,28 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 
 		if (currentStep === 1) {
-			const cinema_type_radioButtons = currentStepElement.querySelectorAll('input[name="cinema_type"]');
+			// const cinema_type_radioButtons = currentStepElement.querySelectorAll('input[name="cinema_type"]');
 			const sub_inversion_radioButtons = currentStepElement.querySelectorAll('input[name="sub_inversion"]');
 			// const ade_radioButtons = currentStepElement.querySelectorAll('input[name="script_ade"]');
 			// const ahe_radioButtons = currentStepElement.querySelectorAll('input[name="script_ahe"]');
-			const is_cinema_type_Selected = Array.from(cinema_type_radioButtons).some((radio) => radio.checked);
+			// const is_cinema_type_Selected = Array.from(cinema_type_radioButtons).some((radio) => radio.checked);
 			const is_sub_inversion_Selected = Array.from(sub_inversion_radioButtons).some((radio) => radio.checked);
 			// const is_ade_Selected = Array.from(ade_radioButtons).some((radio) => radio.checked);
 			// const is_ahe_Selected = Array.from(ahe_radioButtons).some((radio) => radio.checked);
 			if (continueButton) {
-				continueButton.disabled = !((is_cinema_type_Selected && is_sub_inversion_Selected) /*&& is_ade_Selected && is_ahe_Selected*/);
+				continueButton.disabled = !(/*is_cinema_type_Selected &&*/ is_sub_inversion_Selected /*&& is_ade_Selected && is_ahe_Selected*/);
 			}
 		} else if (currentStep === 2) {
+			const cinema_type_radioButtons = currentStepElement.querySelectorAll('input[name="cinema_type"]');
+			const is_cinema_type_Selected = Array.from(cinema_type_radioButtons).some((radio) => radio.checked);
 			const isFileUploaded = fileInput && fileInput.files.length > 0;
 			const areMeasurementsImported = window.measurementsImported || false;
 			if (continueButton) {
-				continueButton.disabled = !(isFileUploaded && areMeasurementsImported);
+				if (isClearCurve == false) {
+					continueButton.disabled = !(isFileUploaded && areMeasurementsImported && is_cinema_type_Selected);
+				} else if (isClearCurve == true) {
+					continueButton.disabled = !(isFileUploaded && areMeasurementsImported);
+				}
 			}
 		} else if (currentStep === 3) {
 			if (continueButton) {
@@ -568,19 +870,19 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		} else if (currentStep === 8) {
 			if (continueButton) {
-				continueButton.disabled = !generateFiltersCompleted;
+				continueButton.disabled = !(generateFiltersCompleted || generateSpeakerCurvesCompleted);
 			}
 		} else if (currentStep === 9) {
 			if (continueButton) {
-				continueButton.disabled = !finalizeTrimsCompleted;
+				continueButton.disabled = !(finalizeTrimsCompleted || generateSubwooferCurvesCompleted);
 			}
 		} else if (currentStep === 10) {
 			if (continueButton) {
-				continueButton.disabled = !optimizeSubDelayCompleted;
+				continueButton.disabled = !(optimizeSubDelayCompleted || generateAVGCurvesCompleted);
 			}
 		} else if (currentStep === 11) {
 			if (continueButton) {
-				continueButton.disabled = !finalizeDistancesCompleted;
+				continueButton.disabled = !(finalizeDistancesCompleted || finalizeRoomCurveCompleted);
 			}
 		} else if (currentStep === 12) {
 			if (continueButton) {
@@ -699,36 +1001,106 @@ document.addEventListener("DOMContentLoaded", function () {
 	// CRITICAL: Keep original cinema_type radio handlers EXACTLY as they were
 	document.querySelectorAll('input[name="cinema_type"]').forEach((radio) => {
 		window.AppCalibration.cleanup.addEventListener(radio, "change", (e) => {
-			if (e.target.value === "75") {
-				console.log("Home Cinema (75dB)");
-				if (typeof targetLevel !== "undefined") targetLevel = 75.0;
-				if (typeof isCirrusLogictargetLevel !== "undefined") isCirrusLogictargetLevel = 78.0;
-				if (typeof isRP22mode !== "undefined") isRP22mode = false;
+			// Helper function to safely set global variables
+			const setGlobalVar = (varName, value) => {
+				if (typeof window[varName] !== "undefined") {
+					window[varName] = value;
+				}
+			};
+
+			// Reset all boolean flags first
+			const resetAllModes = () => {
+				setGlobalVar("isRP22mode", false);
+				setGlobalVar("isDolbymode", false);
+				setGlobalVar("isTHXmode", false);
+				setGlobalVar("isIMAXmode", false);
 				isRP22mode = false;
-			} else if (e.target.value === "85") {
-				console.log("Professional Cinema (85dB)");
-				if (typeof targetLevel !== "undefined") targetLevel = 85.0;
-				if (typeof isCirrusLogictargetLevel !== "undefined") isCirrusLogictargetLevel = 88.0;
-				if (typeof isRP22mode !== "undefined") isRP22mode = false;
-				isRP22mode = false;
-			} else if (e.target.value === "85.1") {
-				console.warn("Cedia RP22 mode!");
-				if (typeof targetLevel !== "undefined") targetLevel = 85.0;
-				if (typeof isCirrusLogictargetLevel !== "undefined") isCirrusLogictargetLevel = 88.0;
-				if (typeof isRP22mode !== "undefined") isRP22mode = true;
-				isRP22mode = true;
+				isDolbymode = false;
+				isTHXmode = false;
+				isIMAXmode = false;
+			};
+
+			// Handle each cinema type
+			switch (e.target.value) {
+				case "75":
+					console.log("Home Cinema (75dB)");
+					setGlobalVar("targetLevel", 75.0);
+					setGlobalVar("isCirrusLogictargetLevel", 75.0);
+					resetAllModes();
+					targetLevel = 75.0;
+					isCirrusLogictargetLevel = 75.0;
+					break;
+
+				case "85":
+					console.log("Professional Cinema (85dB)");
+					setGlobalVar("targetLevel", 85.0);
+					setGlobalVar("isCirrusLogictargetLevel", 85.0);
+					resetAllModes();
+					targetLevel = 85.0;
+					isCirrusLogictargetLevel = 85.0;
+					break;
+
+				case "85.1":
+					console.warn("Cedia RP22 mode!");
+					setGlobalVar("targetLevel", 85.0);
+					setGlobalVar("isCirrusLogictargetLevel", 85.0);
+					setGlobalVar("isRP22mode", true);
+					resetAllModes();
+					isRP22mode = true;
+					targetLevel = 85.0;
+					isCirrusLogictargetLevel = 85.0;
+					break;
+
+				case "85.2":
+					console.warn("Dolby mode!");
+					setGlobalVar("targetLevel", 82.0);
+					setGlobalVar("isCirrusLogictargetLevel", 82.0);
+					setGlobalVar("isDolbymode", true);
+					resetAllModes();
+					isDolbymode = true;
+					targetLevel = 82.0;
+					isCirrusLogictargetLevel = 82.0;
+					break;
+
+				case "85.3":
+					console.warn("THX mode!");
+					setGlobalVar("targetLevel", 85.0);
+					setGlobalVar("isCirrusLogictargetLevel", 85.0);
+					setGlobalVar("isTHXmode", true);
+					resetAllModes();
+					isTHXmode = true;
+					targetLevel = 85.0;
+					isCirrusLogictargetLevel = 85.0;
+
+					break;
+
+				case "85.4":
+					console.warn("IMAX mode!");
+					setGlobalVar("targetLevel", 100);
+					setGlobalVar("isCirrusLogictargetLevel", 100);
+					setGlobalVar("isIMAXmode", true);
+					resetAllModes();
+					isIMAXmode = true;
+					targetLevel = 100.0;
+					isCirrusLogictargetLevel = 100.0;
+					break;
 			}
+
+			// Update display
 			const targetLevelDisplay = document.getElementById("target-level-display");
 			if (targetLevelDisplay && typeof targetLevel !== "undefined") {
 				targetLevelDisplay.textContent = `Offsetting all measurements to ${targetLevel}dB`;
 			}
 
-			if (measurementsImported && sliderInstance) {
+			// Reinitialize slider if needed
+			if (measurementsImported && (sliderInstances.bed || sliderInstances.height)) {
 				console.log("🔄 Cinema mode changed - reinitializing slider with filtered frequencies");
-				resetSlider();
+				// resetSlider();
+				resetSliders();
 				toggleSliderVisibility(true);
 				setTimeout(() => {
-					initializeSlider();
+					// initializeSlider();
+					initializeSliders();
 				}, 100);
 			}
 
@@ -919,7 +1291,7 @@ document.addEventListener("DOMContentLoaded", function () {
 							if (typeof CorrectSPL === "function") {
 								await CorrectSPL();
 							}
-							console.log("SPL correction completed successfully");
+							// console.log("SPL correction completed successfully");
 							splCorrectionCompleted = true;
 							updateContinueButtonState();
 						} catch (error) {
@@ -1025,87 +1397,183 @@ document.addEventListener("DOMContentLoaded", function () {
 				}
 
 				if (currentStep === 8) {
-					console.log("Reached step 8 - triggering Generate filters");
-					generateFiltersCompleted = false;
-					updateContinueButtonState();
-					(async () => {
-						try {
-							console.log("🔧 Starting Filter generation...");
-							if (typeof generateFilters === "function") {
-								await generateFilters();
+					// ClariQ Next
+					if (isClearCurve == false) {
+						console.log("Reached step 8 - triggering Generate filters");
+						generateFiltersCompleted = false;
+						// generateSpeakerCurvesCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Filter generation...");
+								if (typeof generateFilters === "function") {
+									await generateFilters();
+								}
+								console.log(`✅ Filters generation completed successfully`);
+								generateFiltersCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Filters generation", error);
+								generateFiltersCompleted = false;
+								updateContinueButtonState();
 							}
-							console.log(`✅ Filters generation completed successfully`);
-							generateFiltersCompleted = true;
-							updateContinueButtonState();
-						} catch (error) {
-							handleAutoModeError("Filters generation", error);
-							generateFiltersCompleted = false;
-							updateContinueButtonState();
-						}
-					})();
+						})();
+						// ClearCurve Next
+					} else {
+						console.log("Reached step 8 - triggering Generate speaker curves");
+						// generateFiltersCompleted = false;
+						generateSpeakerCurvesCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Speaker Curves generation...");
+								if (typeof TheCurves === "function") {
+									await TheCurves();
+								}
+								console.log(`✅ Speaker Curves generation completed successfully`);
+								generateSpeakerCurvesCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Speaker Curves generation", error);
+								generateSpeakerCurvesCompleted = false;
+								updateContinueButtonState();
+							}
+						})();
+					}
 				}
 
 				if (currentStep === 9) {
-					console.log("Reached step 9 - triggering Finalize Trims");
-					finalizeTrimsCompleted = false;
-					updateContinueButtonState();
-					(async () => {
-						try {
-							console.log("🔧 Starting Finalize trims...");
-							if (typeof finalizeTrims === "function") {
-								finalizeTrims();
+					// ClariQ Next
+					if (isClearCurve == false) {
+						console.log("Reached step 9 - triggering Finalize Trims");
+						finalizeTrimsCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Finalize trims...");
+								if (typeof finalizeTrims === "function") {
+									finalizeTrims();
+								}
+								console.log(`✅ Finalize trims completed successfully`);
+								finalizeTrimsCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Finalize trims", error);
+								finalizeTrimsCompleted = false;
+								updateContinueButtonState();
 							}
-							console.log(`✅ Finalize trims completed successfully`);
-							finalizeTrimsCompleted = true;
-							updateContinueButtonState();
-						} catch (error) {
-							handleAutoModeError("Finalize trims", error);
-							finalizeTrimsCompleted = false;
-							updateContinueButtonState();
-						}
-					})();
+						})();
+					} else {
+						console.log("Reached step 9 - triggering Generate subwoofer(s) curves");
+						generateSubwooferCurvesCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Generate subwoofer(s) curves...");
+								if (typeof TheCurvesSubwoofer === "function") {
+									await TheCurvesSubwoofer();
+								}
+								console.log(`✅ Generate subwoofer(s) curves completed successfully`);
+								generateSubwooferCurvesCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Generate subwoofer(s) curves", error);
+								generateSubwooferCurvesCompleted = false;
+								updateContinueButtonState();
+							}
+						})();
+					}
 				}
 
 				if (currentStep === 10) {
-					console.log("Reached step 10 - triggering Optimize subwoofer(s) delay ");
-					optimizeSubDelayCompleted = false;
-					updateContinueButtonState();
-					(async () => {
-						try {
-							console.log("🔧 Starting subwoofer(s) delay optimisation...");
-							if (typeof optimizeSubDelay === "function") {
-								await optimizeSubDelay();
+					// ClariQ Next
+					if (isClearCurve == false) {
+						console.log("Reached step 10 - triggering Optimize subwoofer(s) delay ");
+						optimizeSubDelayCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting subwoofer(s) delay optimisation...");
+								if (typeof optimizeSubDelay === "function") {
+									await optimizeSubDelay();
+								}
+								console.log(`✅ subwoofer(s) delay optimisation completed successfully`);
+								optimizeSubDelayCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("subwoofer(s) delay optimisation", error);
+								optimizeSubDelayCompleted = false;
+								updateContinueButtonState();
 							}
-							console.log(`✅ subwoofer(s) delay optimisation completed successfully`);
-							optimizeSubDelayCompleted = true;
-							updateContinueButtonState();
-						} catch (error) {
-							handleAutoModeError("subwoofer(s) delay optimisation", error);
-							optimizeSubDelayCompleted = false;
-							updateContinueButtonState();
-						}
-					})();
+						})();
+					} else {
+						console.log("Reached step 10 - triggering Generate average curves");
+						generateAVGCurvesCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Generate average curves...");
+								if (typeof TheCurvesAvg === "function") {
+									await TheCurvesAvg();
+								}
+								console.log(`✅ Generate average curves completed successfully`);
+								generateAVGCurvesCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Generate average curves", error);
+								generateAVGCurvesCompleted = false;
+								updateContinueButtonState();
+							}
+						})();
+					}
 				}
 
 				if (currentStep === 11) {
-					console.log("Reached step 11 - triggering Finalize distances");
-					finalizeDistancesCompleted = false;
-					updateContinueButtonState();
-					(async () => {
-						try {
-							console.log("🔧 Starting Finalize distances optimisation...");
-							if (typeof finalizeDistances === "function") {
-								finalizeDistances();
+					// ClariQ Next
+					if (isClearCurve == false) {
+						console.log("Reached step 11 - triggering Finalize distances");
+						finalizeDistancesCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Finalize distances optimisation...");
+								if (typeof finalizeDistances === "function") {
+									finalizeDistances();
+								}
+								console.log(`✅ Finalize distances optimisation completed successfully`);
+								finalizeDistancesCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Finalize distances", error);
+								finalizeDistancesCompleted = false;
+								updateContinueButtonState();
 							}
-							console.log(`✅ Finalize distances optimisation completed successfully`);
-							finalizeDistancesCompleted = true;
-							updateContinueButtonState();
-						} catch (error) {
-							handleAutoModeError("Finalize distances", error);
-							finalizeDistancesCompleted = false;
-							updateContinueButtonState();
-						}
-					})();
+						})();
+					} else {
+						console.log("Reached step 11 - triggering Finalize room curve");
+						finalizeRoomCurveCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Finalize room curve...");
+								if (typeof TheCurvesClean === "function") {
+									await TheCurvesClean();
+								}
+								console.log(`✅ Finalize room curve completed successfully`);
+								finalizeRoomCurveCompleted = true;
+								isAutoMode = false;
+								isScriptRunning = false;
+								updateCursorStyle();
+								console.log("🎉 Auto script completed! Mouse clicks re-enabled.");
+
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Finalize room curve", error);
+								finalizeRoomCurveCompleted = false;
+								updateContinueButtonState();
+							}
+						})();
+					}
 				}
 
 				if (currentStep === 12) {
@@ -1168,6 +1636,7 @@ document.addEventListener("DOMContentLoaded", function () {
 							updateContinueButtonState();
 							if (typeof runCEDIAReadOnlyAssessment === "function") {
 								await runCEDIAReadOnlyAssessment();
+								saveLogAsPDF();
 							}
 						} catch (error) {
 							handleAutoModeError("updateAdy contents", error);
@@ -1190,19 +1659,23 @@ document.addEventListener("DOMContentLoaded", function () {
 		});
 	});
 
-	// Cross-browser Range Slider (enhanced original)
+	// Updated RangeSlider class to support layer identification
 	class RangeSlider {
-		constructor(container, values) {
+		constructor(container, values, singleMode = false, layerType = "bed") {
 			this.container = container;
 			this.values = values;
+			this.singleMode = singleMode;
+			this.layerType = layerType; // 'bed' or 'height'
 			this.minIndex = 0;
 			this.maxIndex = values.length - 1;
+			this.currentIndex = Math.floor(values.length / 2);
 
+			// Get elements with layer-specific IDs
 			this.sliderTrack = container.querySelector(".slider-track");
-			this.sliderRange = container.querySelector("#sliderRange");
-			this.minHandle = container.querySelector("#minHandle");
-			this.maxHandle = container.querySelector("#maxHandle");
-			this.ticksContainer = container.querySelector("#sliderTicks");
+			this.sliderRange = container.querySelector(`#sliderRange-${layerType}`);
+			this.minHandle = container.querySelector(`#minHandle-${layerType}`);
+			this.maxHandle = container.querySelector(`#maxHandle-${layerType}`);
+			this.ticksContainer = container.querySelector(`#sliderTicks-${layerType}`);
 
 			this.isDragging = false;
 			this.activeHandle = null;
@@ -1212,8 +1685,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
 		init() {
 			this.createTicks();
+			this.setupHandleVisibility();
 			this.bindEvents();
 			this.waitForLayout(() => this.updateDisplay());
+		}
+
+		setupHandleVisibility() {
+			if (this.singleMode) {
+				this.maxHandle.style.display = "none";
+				this.minHandle.style.display = "block";
+				console.log(`🎛️ Single handle mode activated for ${this.layerType.toUpperCase()} layer`);
+			} else {
+				this.minHandle.style.display = "block";
+				this.maxHandle.style.display = "block";
+				console.log(`🎛️ Dual handle mode activated for ${this.layerType.toUpperCase()} layer`);
+			}
 		}
 
 		waitForLayout(callback) {
@@ -1244,16 +1730,18 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 
 		bindEvents() {
+			// Min handle (or single handle) events
 			window.AppCalibration.cleanup.addEventListener(this.minHandle, "mousedown", (e) => this.startDrag(e, "min"));
-			window.AppCalibration.cleanup.addEventListener(this.maxHandle, "mousedown", (e) => this.startDrag(e, "max"));
+			window.AppCalibration.cleanup.addEventListener(this.minHandle, "touchstart", (e) => this.startDrag(e, "min"), { passive: false });
+
+			// Max handle events (only if not in single mode)
+			if (!this.singleMode) {
+				window.AppCalibration.cleanup.addEventListener(this.maxHandle, "mousedown", (e) => this.startDrag(e, "max"));
+				window.AppCalibration.cleanup.addEventListener(this.maxHandle, "touchstart", (e) => this.startDrag(e, "max"), { passive: false });
+			}
 
 			window.AppCalibration.cleanup.addEventListener(document, "mousemove", (e) => this.onDrag(e));
 			window.AppCalibration.cleanup.addEventListener(document, "mouseup", () => this.endDrag());
-
-			// Enhanced touch events with cross-browser support
-			window.AppCalibration.cleanup.addEventListener(this.minHandle, "touchstart", (e) => this.startDrag(e, "min"), { passive: false });
-			window.AppCalibration.cleanup.addEventListener(this.maxHandle, "touchstart", (e) => this.startDrag(e, "max"), { passive: false });
-
 			window.AppCalibration.cleanup.addEventListener(document, "touchmove", (e) => this.onDrag(e), { passive: false });
 			window.AppCalibration.cleanup.addEventListener(document, "touchend", () => this.endDrag());
 
@@ -1288,13 +1776,17 @@ document.addEventListener("DOMContentLoaded", function () {
 			const percent = (e.clientX - rect.left) / rect.width;
 			const index = Math.round(percent * (this.values.length - 1));
 
-			const minDistance = Math.abs(index - this.minIndex);
-			const maxDistance = Math.abs(index - this.maxIndex);
-
-			if (minDistance < maxDistance) {
-				this.minIndex = Math.min(index, this.maxIndex);
+			if (this.singleMode) {
+				this.currentIndex = Math.max(0, Math.min(this.values.length - 1, index));
 			} else {
-				this.maxIndex = Math.max(index, this.minIndex);
+				const minDistance = Math.abs(index - this.minIndex);
+				const maxDistance = Math.abs(index - this.maxIndex);
+
+				if (minDistance < maxDistance) {
+					this.minIndex = Math.min(index, this.maxIndex);
+				} else {
+					this.maxIndex = Math.max(index, this.minIndex);
+				}
 			}
 
 			this.updateDisplay();
@@ -1305,10 +1797,14 @@ document.addEventListener("DOMContentLoaded", function () {
 			const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
 			const index = Math.round(percent * (this.values.length - 1));
 
-			if (this.activeHandle === "min") {
-				this.minIndex = Math.min(index, this.maxIndex);
+			if (this.singleMode) {
+				this.currentIndex = Math.max(0, Math.min(this.values.length - 1, index));
 			} else {
-				this.maxIndex = Math.max(index, this.minIndex);
+				if (this.activeHandle === "min") {
+					this.minIndex = Math.min(index, this.maxIndex);
+				} else {
+					this.maxIndex = Math.max(index, this.minIndex);
+				}
 			}
 
 			this.updateDisplay();
@@ -1320,34 +1816,119 @@ document.addEventListener("DOMContentLoaded", function () {
 			const trackWidth = this.sliderTrack.offsetWidth;
 			const stepWidth = trackWidth / (this.values.length - 1);
 
-			const minPos = this.minIndex * stepWidth;
-			const maxPos = this.maxIndex * stepWidth;
+			if (this.singleMode) {
+				const pos = this.currentIndex * stepWidth;
+				this.minHandle.style.left = `${pos - 12}px`;
+				this.sliderRange.style.left = `0px`;
+				this.sliderRange.style.width = `${pos}px`;
+			} else {
+				const minPos = this.minIndex * stepWidth;
+				const maxPos = this.maxIndex * stepWidth;
 
-			this.minHandle.style.left = `${minPos - 12}px`;
-			this.maxHandle.style.left = `${maxPos - 12}px`;
+				this.minHandle.style.left = `${minPos - 12}px`;
+				this.maxHandle.style.left = `${maxPos - 12}px`;
 
-			this.sliderRange.style.left = `${minPos}px`;
-			this.sliderRange.style.width = `${maxPos - minPos}px`;
+				this.sliderRange.style.left = `${minPos}px`;
+				this.sliderRange.style.width = `${maxPos - minPos}px`;
+			}
 
-			const minValueEl = document.getElementById("minValue");
-			const maxValueEl = document.getElementById("maxValue");
-			const rangeValueEl = document.getElementById("rangeValue");
-			const indicesValueEl = document.getElementById("indicesValue");
+			// Update display values using layer-specific IDs
+			const minValueEl = document.getElementById(`minValue-${this.layerType}`);
+			const maxValueEl = document.getElementById(`maxValue-${this.layerType}`);
+			const rangeValueEl = document.getElementById(`rangeValue-${this.layerType}`);
+			const indicesValueEl = document.getElementById(`indicesValue-${this.layerType}`);
 
-			if (minValueEl) minValueEl.textContent = this.values[this.minIndex];
-			if (maxValueEl) maxValueEl.textContent = this.values[this.maxIndex];
-			if (rangeValueEl) rangeValueEl.textContent = this.values[this.maxIndex] - this.values[this.minIndex];
-			if (indicesValueEl) indicesValueEl.textContent = `${this.minIndex} - ${this.maxIndex}`;
+			if (this.singleMode) {
+				if (minValueEl) minValueEl.textContent = this.values[this.currentIndex];
+				if (maxValueEl) maxValueEl.textContent = "";
+				if (rangeValueEl) rangeValueEl.textContent = "";
+				if (indicesValueEl) indicesValueEl.textContent = `${this.currentIndex}`;
+			} else {
+				if (minValueEl) minValueEl.textContent = this.values[this.minIndex];
+				if (maxValueEl) maxValueEl.textContent = this.values[this.maxIndex];
+				if (rangeValueEl) rangeValueEl.textContent = this.values[this.maxIndex] - this.values[this.minIndex];
+				if (indicesValueEl) indicesValueEl.textContent = `${this.minIndex} - ${this.maxIndex}`;
+			}
 		}
 
 		getSelectedRange() {
-			return {
-				min: this.values[this.minIndex],
-				max: this.values[this.maxIndex],
-				minIndex: this.minIndex,
-				maxIndex: this.maxIndex,
-			};
+			if (this.singleMode) {
+				return {
+					value: this.values[this.currentIndex],
+					index: this.currentIndex,
+					mode: "single",
+					layer: this.layerType,
+				};
+			} else {
+				return {
+					min: this.values[this.minIndex],
+					max: this.values[this.maxIndex],
+					minIndex: this.minIndex,
+					maxIndex: this.maxIndex,
+					mode: "dual",
+					layer: this.layerType,
+				};
+			}
 		}
+	}
+
+	// Update the cinema type change handler
+	function setupCinemaTypeListeners() {
+		const radioButtons = document.querySelectorAll('input[name="cinema_type"]');
+
+		radioButtons.forEach((radio) => {
+			radio.addEventListener("change", function () {
+				if (this.checked) {
+					console.log(`🎬 Cinema mode changed to: ${this.value}`);
+
+					// Reset mode flags
+					isRP22mode = false;
+					isDolbymode = false; // calibrationSPL: 82, peakSPL: 105, subPeakSPL: 115
+					isTHXmode = false; // calibrationSPL: 85, peakSPL: 105, subPeakSPL: 115
+					isIMAXmode = false; // calibrationSPL: 100, peakSPL: 100, subPeakSPL: 115
+					//
+					isClearCurve = false;
+
+					// Set the appropriate mode based on selection
+					switch (this.value) {
+						case "85.1": // Cedia RP22 mode
+							isRP22mode = true;
+							console.log("📊 CEDIA RP22 mode activated - filtering frequencies");
+							break;
+						case "85.2": // Dolby mode
+							// Add any Dolby-specific logic here if needed
+							isDolbymode = true;
+							console.log("📊 DOLBY mode activated - filtering frequencies");
+							break;
+						case "85.3": // THX mode
+							// Add any THX-specific logic here if needed
+							isTHXmode = true;
+							console.log("📊 THX mode activated - filtering frequencies");
+							break;
+						case "85.4": // IMAX mode
+							// Add any IMAX-specific logic here if needed
+							isIMAXmode = true;
+							console.log("📊 IMAX mode activated - filtering frequencies");
+							break;
+						default: // Standard modes (75, 85)
+							console.log("📊 Standard cinema mode activated");
+							break;
+					}
+
+					// Only reinitialize sliders if measurements are imported
+					if (measurementsImported && (sliderInstances.bed || sliderInstances.height)) {
+						console.log("🔄 Reinitializing sliders with new cinema mode...");
+
+						resetSliders();
+						toggleSliderVisibility(true);
+
+						setTimeout(() => {
+							initializeSliders(); // Changed from initializeSlider to initializeSliders
+						}, 100);
+					}
+				}
+			});
+		});
 	}
 
 	// Keep original debug functions
