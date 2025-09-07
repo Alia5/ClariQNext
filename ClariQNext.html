@@ -16,7 +16,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.7 - 05-09-2025 @ 14:58";
+    const nextversion = "ClariQ Next 0.0.8 - 07-09-2025 @ 18:59";
     // ClearCurve
     let isClearCurve = false;
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
@@ -805,7 +805,36 @@
           subHiTrim = -Infinity;
           subLoDelay = Infinity;
           subHiDelay = -Infinity;
+
+          console.info("");
+          console.info("title:", jsonData.title);
+          console.info("enAmpAssignType:", jsonData.enAmpAssignType);
+          console.info("dynamicVolume:", jsonData.dynamicVolume);
+          console.info("enTargetCurveType:", jsonData.enTargetCurveType);
+          console.info("lfcSupport:", jsonData.lfcSupport);
+          console.info("targetModelName:", jsonData.targetModelName);
+          console.info("interfaceVersion:", jsonData.interfaceVersion);
+          console.info("dynamicEq:", jsonData.dynamicEq);
+          console.info("ampAssignInfo:", jsonData.ampAssignInfo);
+          console.info("lfc:", jsonData.lfc);
+          console.info("systemDelay:", jsonData.systemDelay);
+          console.info("auro:", jsonData.auro);
+          console.info("dolbyVersion:", jsonData.dolbyVersion);
+          console.info("upgradeInfo:", jsonData.upgradeInfo);
+          console.info("enMultEQType:", jsonData.enMultEQType);
+          console.info("adcLineup:", jsonData.adcLineup);
+          console.info("subwooferNum:", jsonData.subwooferNum);
+          console.info("subwooferMode:", jsonData.subwooferMode);
+          console.info("subwooferLayout:", jsonData.subwooferLayout);
+          console.info("measurementsPerPosition:", jsonData.measurementsPerPosition);
+
+
+          // console.info("detectedChannels ")
+          // log the full detected channels list in one line
+          console.info("detectedChannels", jsonData.detectedChannels.map(ch => ch.commandId).join(","));
+          console.info("");
           jsonData.detectedChannels.forEach(channel => {
+
             if (channel.commandId && channel.commandId === "C") {
               noCenter = false;
             }
@@ -841,8 +870,8 @@
             if (channel.commandId && heightChannelIds.includes(channel.commandId)) {
               hasHeightChannel = true;
             }
-
-            console.info("Channel", channel.commandId);
+            /*
+            console.info(channel.commandId);
             console.info("customEnSpeakerConnect", channel.channelReport.customEnSpeakerConnect);
             console.info("distance", channel.channelReport.distance);
             console.info("enSpeakerConnect", channel.channelReport.enSpeakerConnect);
@@ -858,6 +887,7 @@
             console.info("midrangeCompensation", channel.midrangeCompensation);
             console.info("trimAdjustment", channel.trimAdjustment);
             console.info("");
+            */
           });
           Object.freeze(noCenter);
           Object.freeze(swChannelCount);
@@ -1052,6 +1082,24 @@
               } else {
                 isCirrusLogictargetLevel = 75.0;
               }
+            } else if (targetLevel == 82) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 82.0;
+              } else {
+                isCirrusLogictargetLevel = 82.0;
+              }
+            } else if (targetLevel == 85) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 85.0;
+              } else {
+                isCirrusLogictargetLevel = 85.0;
+              }
+            } else if (targetLevel == 100) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 100.0;
+              } else {
+                isCirrusLogictargetLevel = 100.0;
+              }
             } else {
               if (isCirrusLogic) {
                 isCirrusLogictargetLevel = 75.0;
@@ -1067,17 +1115,40 @@
               } else {
                 isCirrusLogictargetLevel = 75.0;
               }
-            } else {
+            } else if (targetLevel == 82) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 82.0;
+              } else {
+                isCirrusLogictargetLevel = 82.0;
+              }
+            } else if (targetLevel == 85) {
               if (isCirrusLogic) {
                 isCirrusLogictargetLevel = 85.0;
               } else {
                 isCirrusLogictargetLevel = 85.0;
               }
+            } else if (targetLevel == 100) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 100.0;
+              } else {
+                isCirrusLogictargetLevel = 100.0;
+              }
+            } else {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 75.0;
+              } else {
+                isCirrusLogictargetLevel = 75.0;
+              }
             }
-          } else if (parseFloat(measurements[1].splOffsetdB) == 120) {
+            // OLD MJ HANDLING
+          } else if (parseFloat(measurements[1].splOffsetdB) == 120 &&
+            (!measurements[1].hasOwnProperty('timingReference') ||
+              !measurements[1].hasOwnProperty('delay') ||
+              !measurements[1].hasOwnProperty('timingOffset') ||
+              !measurements[1].hasOwnProperty('signalToNoisedB'))) {
             isAutoMode = false;
             isScriptRunning = false;
-            console.warn("Measurements at 120.0dB old MJ !");
+            console.warn("Measurements at 120.0dB old MJ ! > trying to offset SPL!");
             console.error("120dB measurements (old MJ) are no longer supported!");
             console.error("Please use the ZIP that came with ClariQ Next");
             console.error("Or use custom measurements inside REW");
@@ -1091,19 +1162,63 @@
               } else {
                 isCirrusLogictargetLevel = 75.0;
               }
-            } else {
+            } else if (targetLevel == 82) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 82.0;
+              } else {
+                isCirrusLogictargetLevel = 82.0;
+              }
+            } else if (targetLevel == 85) {
               if (isCirrusLogic) {
                 isCirrusLogictargetLevel = 85.0;
               } else {
                 isCirrusLogictargetLevel = 85.0;
               }
+            } else if (targetLevel == 100) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 100.0;
+              } else {
+                isCirrusLogictargetLevel = 100.0;
+              }
+            } else {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 75.0;
+              } else {
+                isCirrusLogictargetLevel = 75.0;
+              }
             }
           } else {
-            console.warn("Measurements not 78dB MJC, 88dB or 120dB MJ! Measurements actual value", parseFloat(measurements[1].splOffsetdB) + "dB");
+            console.warn("Measurements are not 78dB MJC, 88dB or 120dB MJ! Most likely custom measurements! Measurements actual value:", parseFloat(measurements[1].splOffsetdB) + "dB");
             if (targetLevel == 75) {
-              isCirrusLogictargetLevel = 75.0;
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 75.0;
+              } else {
+                isCirrusLogictargetLevel = 75.0;
+              }
+            } else if (targetLevel == 82) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 82.0;
+              } else {
+                isCirrusLogictargetLevel = 82.0;
+              }
+            } else if (targetLevel == 85) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 85.0;
+              } else {
+                isCirrusLogictargetLevel = 85.0;
+              }
+            } else if (targetLevel == 100) {
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 100.0;
+              } else {
+                isCirrusLogictargetLevel = 100.0;
+              }
             } else {
-              isCirrusLogictargetLevel = 75.0;
+              if (isCirrusLogic) {
+                isCirrusLogictargetLevel = 75.0;
+              } else {
+                isCirrusLogictargetLevel = 75.0;
+              }
             }
           }
         } catch (error) {
@@ -1475,8 +1590,28 @@
         }
 
         if (!mCount) { console.error(`There are no measurements in REW!`); throw new Error; }
-        if (isCirrusLogic) { mCount--; };
+
+        // NEW: Identify and store mic calibration measurements before processing
+        let micCalMeasurements = [];
+        let actualMCount = mCount;
+
+        for (let i = 1; i <= mCount; i++) {
+          if (measurements[i].title.startsWith('_micCal')) {
+            micCalMeasurements.push({
+              index: i,
+              title: measurements[i].title,
+              data: measurements[i]
+            });
+            actualMCount--;
+          }
+        }
+
+        // Use actualMCount for processing (excluding mic cal)
+        if (isCirrusLogic) { actualMCount--; };
+
         let baseMessage = "Resetting IR windows, EQ type, target shape and smoothing for all measurements..."
+
+        // Reset settings for ALL measurements (including mic cal)
         for (let q = 1; q <= mCount; q++) {
           await postSafe(`${baseUrl}/${q}/ir-windows`, { leftWindowType: "Rectangular", rightWindowType: "Rectangular" }, "Update processed");
           await new Promise((resolve) => setTimeout(resolve, speedDelay / 3));
@@ -1488,6 +1623,7 @@
           await new Promise((resolve) => setTimeout(resolve, speedDelay / 3));
           console.infoUpdate(`${baseMessage} (${q}/${mCount})`);
         }
+
         await console.infoUpdate("Resetting default equalizer to 'Generic/Generic'...");
         await postSafe(`http://localhost:4735/eq/default-equaliser`, { manufacturer: "Generic", model: "Generic" }, "Default equaliser changed");
         await new Promise((resolve) => setTimeout(resolve, speedDelay / 3));
@@ -1503,9 +1639,15 @@
         const firstTitle = measurements[1].title;
         console.infoUpdate(`Checking measurement names, indices and sorting...`);
 
-        // First pass: build titleIndices using current version's logic
+        // MODIFIED: Build titleIndices excluding mic calibration measurements
         for (let i = 1; i <= mCount; i++) {
           const title = measurements[i].title;
+
+          // Skip mic calibration measurements for sorting logic
+          if (title.startsWith('_micCal')) {
+            continue;
+          }
+
           const titleKey = title.replace(/\d+/g, '');
           if (!/^\D+(\d+)?$/.test(titleKey)) {
             console.error(`Speaker name ${titleKey} does not end with a numeric index.`);
@@ -1524,7 +1666,7 @@
           }
         }
 
-        // Build expected order: regular speakers first, then subwoofers
+        // Build expected order: regular speakers first, then subwoofers (mic cal will be handled separately)
         const regularGroups = Object.keys(titleIndices).filter(key => !key.startsWith('SW')).sort();
         const swGroups = Object.keys(titleIndices).filter(key => key.startsWith('SW')).sort();
 
@@ -1534,11 +1676,18 @@
           }
         }
 
-        // Check if current REW order matches expected order
+        // MODIFIED: Check if current REW order matches expected order (excluding mic cal)
+        let currentOrderWithoutMicCal = [];
         for (let i = 1; i <= mCount; i++) {
-          if (measurements[i].title !== expectedOrder[i - 1]) {
+          if (!measurements[i].title.startsWith('_micCal')) {
+            currentOrderWithoutMicCal.push(measurements[i].title);
+          }
+        }
+
+        for (let i = 0; i < expectedOrder.length; i++) {
+          if (currentOrderWithoutMicCal[i] !== expectedOrder[i]) {
             needsSorting = true;
-            console.info(`Order mismatch at position ${i}: found "${measurements[i].title}", expected "${expectedOrder[i - 1]}"`);
+            console.info(`Order mismatch at position ${i + 1}: found "${currentOrderWithoutMicCal[i]}", expected "${expectedOrder[i]}"`);
             break;
           }
         }
@@ -1549,12 +1698,32 @@
           try {
             // Get current measurements
             const currentMeasurements = await fetch_mREW();
-            const currentMCount = Object.keys(currentMeasurements).length - (isCirrusLogic ? 1 : 0);
+            const currentMCount = Object.keys(currentMeasurements).length;
 
-            // Parse all measurements and group them
-            const measurementGroups = {};
+            // MODIFIED: Separate mic cal measurements from regular measurements
+            const regularMeasurements = [];
+            const micCalMeasurementsForSorting = [];
+
             for (let i = 1; i <= currentMCount; i++) {
               const name = currentMeasurements[i].title;
+              if (name.startsWith('_micCal')) {
+                micCalMeasurementsForSorting.push({
+                  originalIndex: i,
+                  name: name,
+                  index: 999999 // Ensure mic cal sorts last
+                });
+              } else {
+                regularMeasurements.push({
+                  originalIndex: i,
+                  name: name
+                });
+              }
+            }
+
+            // Parse regular measurements and group them
+            const measurementGroups = {};
+            for (const measurement of regularMeasurements) {
+              const name = measurement.name;
               const titleKey = name.replace(/\d+/g, '');
               const matchResult = name.match(/\d+/);
               if (matchResult && matchResult.length > 0) {
@@ -1565,7 +1734,7 @@
                   measurementGroups[groupKey] = [];
                 }
                 measurementGroups[groupKey].push({
-                  originalIndex: i,
+                  originalIndex: measurement.originalIndex,
                   name: name,
                   index: index
                 });
@@ -1581,14 +1750,18 @@
               sortedGroups[groupKey] = measurementGroups[groupKey].sort((a, b) => a.index - b.index);
             }
 
-            // Determine copy order: regular speakers first, then SW groups
+            // Determine copy order: regular speakers first, then SW groups, then mic cal
             const copyOrder = [];
             const regularGroups = Object.keys(sortedGroups).filter(key => !key.startsWith('SW')).sort();
             const swGroups = Object.keys(sortedGroups).filter(key => key.startsWith('SW')).sort();
 
+            // Add regular and SW measurements
             for (const groupKey of [...regularGroups, ...swGroups]) {
               copyOrder.push(...sortedGroups[groupKey]);
             }
+
+            // MODIFIED: Add mic cal measurements at the end
+            copyOrder.push(...micCalMeasurementsForSorting);
 
             console.infoUpdate(`Copying ${copyOrder.length} measurements in correct numeric order...`);
 
@@ -1613,7 +1786,7 @@
 
             // Re-fetch to get the remaining measurements (all should be -copy versions now)
             const copiedMeasurements = await fetch_mREW();
-            const newMCount = Object.keys(copiedMeasurements).length - (isCirrusLogic ? 1 : 0);
+            const newMCount = Object.keys(copiedMeasurements).length;
 
             // Rename all measurements that have "-copy" suffix
             for (let q = 1; q <= newMCount; q++) {
@@ -1631,19 +1804,33 @@
               }
             }
 
-            console.infoUpdate("Manual sorting completed. Re-fetching measurement data...");
+            console.infoUpdate("ClariQ Next sorting completed. Mic calibration preserved at end.");
 
             // Re-fetch and rebuild measurement data
             const sortedMeasurements = await fetch_mREW();
             mCount = Object.keys(sortedMeasurements).length;
-            if (isCirrusLogic) { mCount--; };
 
-            // Clear and rebuild the titles and indices with sorted data
+            // Recalculate actualMCount after sorting
+            actualMCount = mCount;
+            for (let i = 1; i <= mCount; i++) {
+              if (sortedMeasurements[i].title.startsWith('_micCal')) {
+                actualMCount--;
+              }
+            }
+            if (isCirrusLogic) { actualMCount--; };
+
+            // Clear and rebuild the titles and indices with sorted data (excluding mic cal)
             Object.keys(titles).forEach(key => delete titles[key]);
             Object.keys(titleIndices).forEach(key => delete titleIndices[key]);
 
             for (let i = 1; i <= mCount; i++) {
               const title = sortedMeasurements[i].title;
+
+              // Skip mic calibration measurements
+              if (title.startsWith('_micCal')) {
+                continue;
+              }
+
               const titleKey = title.replace(/\d+/g, '');
 
               if (!titles[titleKey]) {
@@ -1657,20 +1844,17 @@
               }
             };
 
-            // console.infoUpdate("Manual sorting and re-indexing completed successfully.");
             console.infoUpdate("ClariQ Next sorting and re-indexing completed successfully.");
             enableGraph();
 
           } catch (error) {
-            // console.error("Failed to perform manual sorting:", error);
-            // console.error("Please manually sort measurements in REW and run the script again.");
             console.error("Failed to perform ClariQ Next sorting:", error);
             console.error("Please report your issue on discord!");
             throw new Error;
           }
         }
 
-        // Continue with rest of original logic
+        // Continue with rest of original logic using actualMCount
         nSpeakers = 0;
         nSubs = 0;
         for (const titleKey in titleIndices) {
@@ -1742,14 +1926,12 @@
             targetCurveName = "";
             await enableRoomCurve();
           }
-          // await fetchSafe('target-level', 1, 75.0);
           await fetchSafe('target-level', 1, targetLevel)
           const targetCurve = await postNext('Generate target measurement', 1);
           const targetCurveIdx = Object.keys(targetCurve.results)[0];
           targetResponse = await fetchSafe(`frequency-response?smoothing=1%2F48&ppo=96`, targetCurveIdx);
 
           if (isDebugMode) {
-            // ADD THIS DEBUG BLOCK
             console.log("=== TARGET CURVE SPL DEBUG ===");
             const targetArray200to2000 = response2array(targetResponse, 200, 2000);
             const targetSPL200to2000 = targetArray200to2000.reduce((acc, val) => acc + val, 0) / targetArray200to2000.length;
@@ -1763,7 +1945,7 @@
             console.log("=== END TARGET CURVE DEBUG ===");
           }
 
-          Object.freeze(targetResponse); // ensure it doesn't change once optimization starts
+          Object.freeze(targetResponse);
           await postDelete(targetCurveIdx);
         }
         else {
@@ -1842,6 +2024,8 @@
       async function groundWorks() {
         let measurements = await fetch_mREW();
         let mCount = Object.keys(measurements).length;
+
+        /*
         // move sub measurements to the bottom of the list in REW
         for (let i = 1; i <= mCount; i++) {
           const name = measurements[i].title;
@@ -1853,6 +2037,7 @@
           const name = measurements[i].title;
           if (name.startsWith("SW")) { await postDelete(i); }
         }
+        */
         const micPositions = mCount / (nSpeakers + nSubs);
 
         if (bassMode != "Directional" && swChannelCount > 1) {
@@ -1865,6 +2050,8 @@
           console.info(`'Standard bass' mode with '${swChannelCount}' subwoofer detected.`);
         }
 
+        // debugger;
+
         console.log(`Optimizing speaker volume & time alignment using <${micPositions}> different microphone positions...`);
         console.info(`Starting...`);
         measurements = await fetch_mREW();
@@ -1874,34 +2061,60 @@
         for (let i = 1; i <= mCount; i += micPositions) {
           console.infoUpdate(`Computing optimal spatial averaging configuration for speaker #${(i - 1) / micPositions + 1}`)
           const indices = Array.from({ length: micPositions }, (_, j) => i + j);
+
+          console.info(`📍 Processing microphone positions: indices [${indices.join(', ')}]`)
+
           if (micPositions > 1) {
+            console.info(`🔄 Cross-correlating ${micPositions} microphone positions...`);
             await postNext('Cross corr align', indices);
+            console.log(`✅ Cross-correlation alignment completed`);
           }
           mSec[count] = 0;
           title[count] = measurements[i].title.slice(0, -1) + "o";
-          if (title[count].startsWith("SW")) { title[count] = title[count].slice(0, -6) + "o"; }
+          // if (title[count].startsWith("SW")) { title[count] = title[count].slice(0, -6) + "o"; }
           // trim determination using the MLP measurement
+          console.info(`🎯 Calculating trim for MLP (Main Listening Position) - Index ${i}`)
           if (title[count].startsWith("SW")) {
+            console.info(`MLP (Main Listening Position) measurement for: ${title[count]}`);
             customLevel[count] = await getSubTrim(i);
-          }
-          else {
+          } else {
+            console.info(`MLP (Main Listening Position) measurement: ${title[count]}`);
             customLevel[count] = await getSpeakerTrim(i);
           }
+          console.info(`📊 MLP trim result: ${customLevel[count]}dB`);
           // level match all other positions to MLP & average
-          await alignVol2MLP(indices, i);
+          // await alignVol2MLP(indices, i);
           if (micPositions === 1) {
+            console.info(`📋 Single microphone position - copying measurement`);
             await postSafe(`${baseUrl}/${i}/command`, { command: "Response copy" }, "Completed"); // nothing to average
-          }
-          else {
+          } else {
+            console.info(`🧮 Averaging ${micPositions} microphone positions...`);
             await postNext('Magn plus phase average', indices); // do not use VA, it reduces SPL!
+            console.info(`✅ Spatial averaging completed for ${micPositions} positions`);
           }
           // the "o" measurement
           const idx = mCount + count;
           await fetch_mREW(idx, 'PUT', { title: title[count] });
-          await postNext('Add SPL offset', idx, { offset: customLevel[count] });
+
+          console.info(`📝 Created averaged measurement: Index ${idx} - "${title[count]}"`);
+          console.info(`🎯 Calculating trim for averaged result - Index ${idx}`);
+
+          // await postNext('Add SPL offset', idx, { offset: customLevel[count] });
+          // console.info(`final averaged measurement: ${title[count]}`);
+          // o vs target curve
+          const volAdjust = title[count].startsWith("SW") ? await getSubTrim(idx) : await getSpeakerTrim(idx);
+
+          console.info(`📊 Averaged trim result: ${volAdjust}dB`);
+
+          await postNext('Add SPL offset', idx, { offset: volAdjust });
+          console.info(`🔧 Applied ${volAdjust}dB SPL offset to averaged measurement`);
+          console.info(`─────────────────────────────────────────────────────────`);
           // go to next channel
           count++;
         }
+
+        // debugger;
+
         console.infoUpdate("Deleting processed measurements...");
         for (let i = mCount; i >= 1; i--) {
           await postDelete(i);
@@ -2219,7 +2432,9 @@
           await postSafe(`http://localhost:4735/eq/match-target-settings`, {
             startFrequency: m3dBPoints[i][0],
             endFrequency: m3dBPoints[i][1],
-            individualMaxBoostdB: isSub ? 6 : 3,
+            // endFrequency: isSub ? 250 : 19000,
+            // individualMaxBoostdB: isSub ? 6 : 3,
+            individualMaxBoostdB: isSub ? 3 : 3,
             overallMaxBoostdB: isSub ? 3 : 0,
             flatnessTargetdB: 1,
             allowNarrowFiltersBelow200Hz: true,
@@ -2238,6 +2453,20 @@
           catch (error) {
             // not really an issue if it fails
             console.debug(`${commandId[i]} could not be equalized!`);
+          }
+
+          // SANITY CHECK: Ensure no filters exceed -20dB gain limit
+          try {
+            const filters = await getFilters(i);
+            const violations = sanityCheck(filters);
+
+            if (violations) {
+              console.warn(`${commandId[i]} - Fixed ${violations.length} filter(s) exceeding -20dB limit`);
+              await updateFilters(i, violations);
+            }
+          }
+          catch (error) {
+            console.debug(`${commandId[i]} - Sanity check failed:`, error);
           }
 
           // Apply Advanced Filters (if enabled, has a type other than null and is not subwoofer) 
@@ -2345,6 +2574,53 @@
         // clean up EQ params
         for (let i = nChannels + 1; i <= nChannels * 3; i++) {
           await postSafe(`${baseUrl}/${i}/target-settings`, { shape: "None" }, "Update processed");
+        }
+      }
+
+      async function getFilters(measurementId) {
+        const response = await fetch(`http://localhost:4735/measurements/${measurementId}/filters`, {
+          method: 'GET',
+          headers: { 'accept': 'application/json' }
+        });
+        return await response.json();
+      }
+
+      function sanityCheck(filters) {
+        const violations = [];
+
+        filters.forEach(filter => {
+          if (filter.hasOwnProperty('gaindB') && filter.gaindB < -20) {
+            violations.push({
+              index: filter.index,
+              currentGain: filter.gaindB,
+              filter: filter  // Keep reference to the actual filter
+            });
+            filter.gaindB = -19.9; // Fix it
+          }
+        });
+
+        return violations.length > 0 ? violations : null;
+      }
+
+      async function updateFilters(measurementId, violations) {
+        // Update only the filters that had violations
+        for (const violation of violations) {
+          const response = await fetch(`http://localhost:4735/measurements/${measurementId}/filters`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'accept': 'application/json'
+            },
+            body: JSON.stringify(violation.filter)  // Send single filter object directly
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`PUT failed: ${response.status} - ${errorText}`);
+          }
+
+          const result = await response.json();
+          console.log(`Filter ${violation.filter.index} updated:`, result.message);
         }
       }
 
@@ -3011,7 +3287,7 @@
 
         console.log(`BED layer range: ${bedMinFreq}Hz - ${bedMaxFreq}Hz`);
         console.log(`HEIGHT layer range: ${heightMinFreq}Hz - ${heightMaxFreq}Hz`);
-        console.log("Finalizing crossover frequencies to best follow the target curve...");
+        console.info("Finalizing crossover frequencies to best follow the target curve...");
 
         // Function to get the appropriate frequency range for a speaker
         function getSpeakerFreqRange(speakerId) {
@@ -3060,7 +3336,7 @@
             freq >= effectiveMinXO && freq <= effectiveMaxXO
           );
 
-          console.log(`${cmdIds} filtered frequency range: ${filteredFreqIndex.length} frequencies from ${filteredFreqIndex[0] || 'none'} to ${filteredFreqIndex[filteredFreqIndex.length - 1] || 'none'}Hz`);
+          console.info(`${cmdIds} filtered frequency range: ${filteredFreqIndex.length} frequencies from ${filteredFreqIndex[0] || 'none'} to ${filteredFreqIndex[filteredFreqIndex.length - 1] || 'none'}Hz`);
 
           // finalize xo that is closest match to target curve
           const initialXO = parseFloat(customCrossover[count]);
@@ -3109,7 +3385,7 @@
             }
 
             // final XO determination logic
-            console.infoUpdate(`${cmdIds} - Initial XO: ${initialXO}hz → Checking XO: ${checkXO}hz (RMS: ${rmsError.toFixed(3)}) [${speakerRange.layer} layer]`);
+            console.info(`${cmdIds} - Initial XO: ${initialXO}hz → Checking XO: ${checkXO}hz (RMS: ${rmsError.toFixed(3)}) [${speakerRange.layer} layer]`);
 
             for (let k = mCount + 3; k > mCount; k--) {
               await postDelete(k);
@@ -3131,7 +3407,7 @@
             count++;
           }
           count++;
-          console.infoUpdate(`${cmdIds} - Initial XO: ${initialXO}hz → Best XO: ${bestXO}hz (RMS: ${minRmsError.toFixed(3)}) [${speakerRange.layer} layer]`);
+          console.log(`${cmdIds} - Initial XO: ${initialXO}hz → Best XO: ${bestXO}hz (RMS: ${minRmsError.toFixed(3)}) [${speakerRange.layer} layer]`);
         }
 
         // Log the final results grouped by layer
@@ -3140,6 +3416,7 @@
         const unknownResults = RP22BestXO.filter(result => result[2] === 'DEFAULT' || result[2] === 'UNKNOWN');
 
         console.log("=== FINAL CROSSOVER OPTIMIZATION RESULTS ===");
+        /*
         if (bedResults.length > 0) {
           console.log("BED Layer speakers:", bedResults);
         }
@@ -3149,8 +3426,13 @@
         if (unknownResults.length > 0) {
           console.log("Default/Unknown speakers:", unknownResults);
         }
-
         console.log("Complete RP22BestXO results:", RP22BestXO);
+        */
+
+        for (let i = 0; i < RP22BestXO.length; i++) {
+          const [code, frequency, layer] = RP22BestXO[i];
+          console.log(`${code} → ${frequency}Hz → [${layer} layer]`);
+        }
 
         return RP22BestXO;
       }
@@ -3248,32 +3530,58 @@
       async function getTrim(idx, start, end) {
         const targetArray = response2array(targetResponse, start, end);
         const targetSPL = targetArray.reduce((acc, val) => acc + val, 0) / targetArray.length;
+
+        // Intelligently detect device type based on frequency range
+        const isSubwoofer = (end <= 150);
+        // const isSubwoofer = (end < 250);
+
         let freqResponse;
-        if (start == 200 && end == 2000 && isRP22mode == false) {
-          freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
-          console.info("getTrim: applying Default - 1/6 smoothing - assume speakers");
 
-        } else if (start == 200 && end == 2000 && isRP22mode == true) {
-          freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
-          console.info("getTrim: applying CEDIA RP22 - 1/1 smoothing - assume speakers");
-
-        } else if (start >= 500 && isRP22mode == true) {
-          freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
-          console.info("getTrim: applying CEDIA RP22 - 1/1 smoothing - assume speakers");
-        } else if (start < 500 && isRP22mode == true) {
+        if (isRP22mode) {
+          // RP22 uses 1/3 octave smoothing for ALL measurements (speakers and subwoofers)
           freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
-          console.info("getTrim: applying CEDIA RP22 - 1/3 smoothing - assume subwoofer(s)");
-
+          console.info(`getTrim: RP22 ${isSubwoofer ? 'subwoofer' : 'speaker'} (${start}-${end}Hz) - 1/3 smoothing`);
+        } else if (isDolbymode) {
+          if (isSubwoofer) {
+            freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
+            console.info(`getTrim: Dolby subwoofer (${start}-${end}Hz) - 1/3 smoothing`);
+          } else {
+            freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
+            console.info(`getTrim: Dolby speaker (${start}-${end}Hz) - 1/6 smoothing`);
+          }
+        } else if (isTHXmode) {
+          if (isSubwoofer) {
+            freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
+            console.info(`getTrim: THX subwoofer (${start}-${end}Hz) - 1/3 smoothing`);
+          } else {
+            freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
+            console.info(`getTrim: THX speaker (${start}-${end}Hz) - 1/6 smoothing`);
+          }
+        } else if (isIMAXmode) {
+          if (isSubwoofer) {
+            freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
+            console.info(`getTrim: IMAX subwoofer (${start}-${end}Hz) - 1/3 smoothing`);
+          } else {
+            freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
+            console.info(`getTrim: IMAX speaker (${start}-${end}Hz) - 1/6 smoothing`);
+          }
         } else {
-          freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
-          console.info("getTrim: applying Default - 1/6 smoothing");
+          // Default mode
+          if (isSubwoofer) {
+            freqResponse = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
+            console.info(`getTrim: Default subwoofer (${start}-${end}Hz) - 1/3 smoothing`);
+          } else {
+            freqResponse = await fetchSafe('frequency-response?smoothing=1/6&ppo=96', idx);
+            console.info(`getTrim: Default speaker (${start}-${end}Hz) - 1/6 smoothing`);
+          }
         }
+
         const freqArray = response2array(freqResponse, start, end);
         const freqSPL = freqArray.reduce((acc, val) => acc + val, 0) / freqArray.length;
 
         if (isDebugMode) {
-          // ADD THIS DEBUG CODE:
           console.log(`*** TRIM DEBUG for measurement ${idx} (${start}-${end}Hz) ***`);
+          console.log(`Device type detected: ${isSubwoofer ? 'SUBWOOFER' : 'SPEAKER'}`);
           console.log(`Target curve average SPL: ${targetSPL.toFixed(1)}dB`);
           console.log(`Measurement average SPL: ${freqSPL.toFixed(1)}dB`);
           console.log(`Calculated trim: ${(targetSPL - freqSPL).toFixed(1)}dB`);
@@ -3282,6 +3590,7 @@
           console.log(`Current measurement SPL offset: ${currentSplOffset}dB`);
           console.log(`Effective measurement level: ${(freqSPL + currentSplOffset).toFixed(1)}dB`);
         }
+
         const offset = targetSPL - freqSPL;
         return Math.round(offset * 2) / 2; // round to nearest 0.5
       }
@@ -3301,28 +3610,32 @@
         switch (mode) {
           case 'RP22':
             param2 = Math.max(actualLow, 20);
-            param3 = Math.min(actualHigh, 20000);
+            // param3 = Math.min(actualHigh, 20000);
+            param3 = Math.max(actualHigh, 20000);
             modeSpkMin = 20;
             modeSpkMax = 20000;
             break;
 
           case 'DOLBY':
             param2 = Math.max(actualLow, 31.5);  // ← Now consistent with subwoofer
-            param3 = Math.min(actualHigh, 16000);
+            // param3 = Math.min(actualHigh, 16000);
+            param3 = Math.max(actualHigh, 16000);
             modeSpkMin = 31.5;
             modeSpkMax = 16000;
             break;
 
           case 'THX':
             param2 = Math.max(actualLow, 20);
-            param3 = Math.min(actualHigh, 20000);
+            // param3 = Math.min(actualHigh, 20000);
+            param3 = Math.max(actualHigh, 20000);
             modeSpkMin = 20;
             modeSpkMax = 20000;
             break;
 
           case 'IMAX':
             param2 = Math.max(actualLow, 20);
-            param3 = Math.min(actualHigh, 20000);
+            // param3 = Math.min(actualHigh, 20000);
+            param3 = Math.max(actualHigh, 20000);
             modeSpkMin = 20;
             modeSpkMax = 20000;
             break;
@@ -3405,6 +3718,7 @@
       }
 
       async function getDynamicBassFill(idx) {
+        // vs -from target curve (start and end)
         const startFreq = Math.round(await getLow3dBPoint(idx, modeSubXOMin, modeSubXOMax));
         const endFreq = Math.round(await getHigh3dBPoint(idx, modeSubXOMin, modeSubXOMax));
         const subFreqResponse = await fetchSafe('frequency-response?smoothing=1%2F6&ppo=96', idx);
@@ -3419,6 +3733,7 @@
         return dynamicBassFill;
       }
 
+      /*
       async function alignVol2MLP(indices, mlpIdx) {
         if (indices.length <= 1) { return; }
         const measurements = await fetch_mREW();
@@ -3431,6 +3746,7 @@
           await postNext('Add SPL offset', indices[i], { offset: volAdjust });
         }
       }
+      */
 
       async function align4system(ind1, ind2, xo) {
         const start = Math.round(xo / 2), end = Math.round(xo * 2);
@@ -3854,6 +4170,10 @@
           + (AdvancedFiltersType === "GAMINGimmersive" ? "AGF_" : "")
           + (AdvancedFiltersType === "GAMINGvoice" ? "AGF_" : "")
           + (AdvancedFiltersType === "GAMINGbalanced" ? "AGF_" : "")
+          + (isRP22mode ? "RP22_" : "")
+          + (isDolbymode ? "DOLBY_" : "")
+          + (isTHXmode ? "THX_" : "")
+          + (isIMAXmode ? "IMAX_" : "")
           + swInvMsg + `${tcName}_ClariQNext_${timestamp}.ady`);
         downloadLink.style.display = "none";
         document.body.appendChild(downloadLink);
@@ -6687,7 +7007,7 @@
           let text = entry.textContent || entry.innerText;
 
           // Debug: Check what classes each entry has
-          console.log(`Entry classes: ${entry.className}, text preview: ${text.substring(0, 30)}...`);
+          // console.log(`Entry classes: ${entry.className}, text preview: ${text.substring(0, 30)}...`);
 
           // Clean up emojis and special characters that jsPDF can't handle
           text = text
@@ -6804,9 +7124,9 @@
           doc.setTextColor(entry.color[0], entry.color[1], entry.color[2]);
 
           // Debug: Log color being applied (only for first few entries to avoid spam)
-          if (index < 5) {
-            console.log(`Entry ${index}: Color [${entry.color.join(', ')}] for text: ${entry.text.substring(0, 50)}...`);
-          }
+          // if (index < 5) {
+          //   console.log(`Entry ${index}: Color [${entry.color.join(', ')}] for text: ${entry.text.substring(0, 50)}...`);
+          // }
 
           // Split long lines to fit page width, but respect word boundaries
           const lines = doc.splitTextToSize(entry.text, maxLineWidth);

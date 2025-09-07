@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.7 - 05-09-2025 @ 14:58
+// ClariQ Next 0.0.8 - 07-09-2025 @ 18:59
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -1023,7 +1023,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			// Handle each cinema type
 			switch (e.target.value) {
 				case "75":
-					console.log("Home Cinema (75dB)");
+					console.log("Home Cinema (75dB) set");
 					setGlobalVar("targetLevel", 75.0);
 					setGlobalVar("isCirrusLogictargetLevel", 75.0);
 					resetAllModes();
@@ -1032,7 +1032,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					break;
 
 				case "85":
-					console.log("Professional Cinema (85dB)");
+					console.log("Professional Cinema (85dB) set");
 					setGlobalVar("targetLevel", 85.0);
 					setGlobalVar("isCirrusLogictargetLevel", 85.0);
 					resetAllModes();
@@ -1041,7 +1041,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					break;
 
 				case "85.1":
-					console.warn("Cedia RP22 mode!");
+					console.warn("Cedia RP22 mode! set");
 					setGlobalVar("targetLevel", 85.0);
 					setGlobalVar("isCirrusLogictargetLevel", 85.0);
 					setGlobalVar("isRP22mode", true);
@@ -1052,7 +1052,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					break;
 
 				case "85.2":
-					console.warn("Dolby mode!");
+					console.warn("Dolby mode! set");
 					setGlobalVar("targetLevel", 82.0);
 					setGlobalVar("isCirrusLogictargetLevel", 82.0);
 					setGlobalVar("isDolbymode", true);
@@ -1063,7 +1063,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					break;
 
 				case "85.3":
-					console.warn("THX mode!");
+					console.warn("THX mode! set");
 					setGlobalVar("targetLevel", 85.0);
 					setGlobalVar("isCirrusLogictargetLevel", 85.0);
 					setGlobalVar("isTHXmode", true);
@@ -1075,7 +1075,7 @@ document.addEventListener("DOMContentLoaded", function () {
 					break;
 
 				case "85.4":
-					console.warn("IMAX mode!");
+					console.warn("IMAX mode! set");
 					setGlobalVar("targetLevel", 100);
 					setGlobalVar("isCirrusLogictargetLevel", 100);
 					setGlobalVar("isIMAXmode", true);
