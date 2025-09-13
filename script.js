@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.8 - 07-09-2025 @ 18:59
+// ClariQ Next 0.0.9 - 13-09-2025 @ 15:56
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -306,13 +306,15 @@ document.addEventListener("DOMContentLoaded", function () {
 		// RP22 mode - different filtering for bed vs height
 		if (typeof isRP22mode !== "undefined" && isRP22mode) {
 			if (layer === "bed") {
-				const frequenciesToRemove = [40, 60, 200, 250];
+				// const frequenciesToRemove = [40, 60, 200, 250];
+				const frequenciesToRemove = [];
 				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
 				console.log(`🎛️ Cedia RP22 mode (BED): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
 				return filteredFreqs;
 			} else if (layer === "height") {
 				// For height channels in RP22 mode, maybe different filtering or same
-				const frequenciesToRemove = [40, 60, 200, 250]; // Could be different for heights
+				// const frequenciesToRemove = [40, 60, 200, 250]; // Could be different for heights
+				const frequenciesToRemove = []; // Could be different for heights
 				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
 				console.log(`🎛️ Cedia RP22 mode (HEIGHT): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
 				return filteredFreqs;
@@ -629,6 +631,24 @@ document.addEventListener("DOMContentLoaded", function () {
 		if (warningElement) {
 			warningElement.textContent = "✅ Measurements imported successfully! Cinema modes are now available.";
 			warningElement.className = "success";
+
+			if (isClearCurve) {
+				warningElement.textContent = "✅ Measurements imported successfully! Merge sliders are now available.";
+				warningElement.className = "success";
+			}
+
+			// Rest of the function remains the same...
+			const bmsElement = document.getElementById("BMs");
+			const cinemaModesElement = document.getElementById("cinemaModes");
+
+			if (!isClearCurve) {
+				if (bmsElement) {
+					bmsElement.style.display = "block";
+				}
+				if (cinemaModesElement) {
+					cinemaModesElement.style.display = "flex";
+				}
+			}
 		}
 	}
 
@@ -1550,16 +1570,16 @@ document.addEventListener("DOMContentLoaded", function () {
 							}
 						})();
 					} else {
-						console.log("Reached step 11 - triggering Finalize room curve");
+						console.log("Reached step 11 - triggering Finalize House curve");
 						finalizeRoomCurveCompleted = false;
 						updateContinueButtonState();
 						(async () => {
 							try {
-								console.log("🔧 Starting Finalize room curve...");
+								console.log("🔧 Starting Finalize House curve...");
 								if (typeof TheCurvesClean === "function") {
 									await TheCurvesClean();
 								}
-								console.log(`✅ Finalize room curve completed successfully`);
+								console.log(`✅ Finalize House curve completed successfully`);
 								finalizeRoomCurveCompleted = true;
 								isAutoMode = false;
 								isScriptRunning = false;
@@ -1568,7 +1588,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 								updateContinueButtonState();
 							} catch (error) {
-								handleAutoModeError("Finalize room curve", error);
+								handleAutoModeError("Finalize House curve", error);
 								finalizeRoomCurveCompleted = false;
 								updateContinueButtonState();
 							}

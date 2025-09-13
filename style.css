@@ -1,4 +1,4 @@
-/* ClariQ Next 0.0.8 - 07-09-2025 @ 18:59 */
+/* ClariQ Next 0.0.9 - 13-09-2025 @ 15:56 */
 :root {
 	--primary-color: #2563eb;
 	--secondary-color: #3b82f6;
@@ -480,11 +480,15 @@ body {
 }
 
 ul ul li {
-	font-size: 0.56vw;
+	/* font-size: 0.56vw; */
+	/*font-size: 0.7vw;*/
+	font-size: 0.67vw;
 }
 
 ul ul ul li {
-	font-size: 0.5vw;
+	/* font-size: 0.5vw; */
+	/*font-size: 0.65vw;*/
+	font-size: 0.62vw;
 }
 
 /* UPDATE */
@@ -502,7 +506,8 @@ label {
 	margin-right: auto;
 	width: 50%;
 	margin-bottom: 30px;
-	max-width: 64px;
+	/*max-width: 64px;*/
+	max-width: 54px;
 }
 
 .font-toggle {
@@ -555,4 +560,18 @@ body[data-font="dyslexic"] span {
 /* Load OpenDyslexic font from local files */
 .success {
 	color: #4caf50;
+}
+
+/* 0.0.9 */
+#BMs {
+	display: none;
+}
+
+#cinemaModes {
+	display: none;
+}
+
+ul li {
+	/*font-size: 0.77vw;*/
+	font-size: 0.74vw;
 }
