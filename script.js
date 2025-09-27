@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.9 - 13-09-2025 @ 15:56
+// ClariQ Next 0.0.10 - 27-09-2025 @ 16:30
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -506,7 +506,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Function to handle slider value changes
 	function handleSliderChange(layerType, currentRange) {
-		console.log(`🎛️ ${layerType.toUpperCase()} layer slider changed:`, currentRange);
+		// console.log(`🎛️ ${layerType.toUpperCase()} layer slider changed:`, currentRange);
+		const rangeText = currentRange.min === currentRange.max ? `${currentRange.min}Hz` : `${currentRange.min}Hz to ${currentRange.max}Hz`;
+		console.log(`🎛️ ${layerType.toUpperCase()} layer slider changed: ${rangeText}`);
 
 		if (currentRange.mode === "single") {
 			// Store the selected frequency for the specific layer
@@ -1361,6 +1363,17 @@ document.addEventListener("DOMContentLoaded", function () {
 								validateConfiguration();
 							}
 							// TEST
+
+							// TEST
+							// if (typeof detectSBIRFromMeasurements === "function") {
+							// Add SBIR detection before filter generation
+							//	sbirPatterns = await detectSBIRFromMeasurements();
+							//	console.error("test not an error!");
+							//	console.error("detectSBIRFromMeasurements -> RAN!");
+							//	console.error("test not an error!");
+							// }
+							// TEST
+
 							updateContinueButtonState();
 						} catch (error) {
 							handleAutoModeError("debugREW or groundWorks", error);
@@ -1425,10 +1438,18 @@ document.addEventListener("DOMContentLoaded", function () {
 						updateContinueButtonState();
 						(async () => {
 							try {
+								// ADD THIS: Detect SBIR before filter generation
+								console.log("🔧 Detect SBIR before filter generation...");
+								if (typeof detectSBIRFromMeasurements === "function") {
+									await detectSBIRFromMeasurements();
+								}
+								// ADD THIS: Detect SBIR before filter generation
+
 								console.log("🔧 Starting Filter generation...");
 								if (typeof generateFilters === "function") {
 									await generateFilters();
 								}
+
 								console.log(`✅ Filters generation completed successfully`);
 								generateFiltersCompleted = true;
 								updateContinueButtonState();
@@ -1627,6 +1648,14 @@ document.addEventListener("DOMContentLoaded", function () {
 							if (typeof drawResults === "function") {
 								await drawResults();
 							}
+
+							// ADD THIS: Display SBIR results
+							console.log("🔧 Starting Draw 'expected' results...");
+							if (typeof displaySBIRResults === "function") {
+								displaySBIRResults();
+							}
+							// ADD THIS: Display SBIR results
+
 							console.log(`✅ Draw 'expected' results completed successfully`);
 							drawResultsCompleted = true;
 							updateContinueButtonState();

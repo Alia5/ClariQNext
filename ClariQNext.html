@@ -16,7 +16,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.9 - 13-09-2025 @ 15:56";
+    const nextversion = "ClariQ Next 0.0.10 - 27-09-2025 @ 16:30";
     // ClearCurve
     let isClearCurve = false;
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
@@ -36,6 +36,9 @@
       "AV7704", "AV7705", "NR1608", "NR1609", "SR5012", "SR5013", "SR6012", "SR6013", "SR7011", "SR7012", "SR7013", "SR8012"];
     const models70xo = ["A-900H", "MA 70S", "-S970H", "X2800H", "-S670H", " AV 10", " AV 20", "VR-A1H", "VC-A1H", "X3800H", "X4800H",
       "EMA 30", "EMA 40", "EMA 50", "X6800H", "R-A10H", "C-A10H"];
+    // https://www.dirac.com/online-store/ 18m supported  
+    const modelsDirac = ["VR-A1H", "VC-A1H", "R-A10H", "C-A10H", "X6800H", "X4800H", "X3800H", " AV 10", " AV 20", "EMA 30", "EMA 40", "EMA 50"];
+    let DiracEnabled = false;
 
     const baseUrl = 'http://localhost:4735/measurements', retryDelay = 500;
     let adyContents, fileName, sOs, isCirrusLogic, flDist, nChannels, nSpeakers, nSubs, noCenter;
@@ -52,37 +55,17 @@
     let needsSorting = false;
     let expectedOrder = [];
     // MODES
-    let isDarkMode = true; // start script in Darkmode 
-    let isDolbymode = false; // calibrationSPL: 82, peakSPL: 105, subPeakSPL: 115 
-    let isTHXmode = false; // calibrationSPL: 85, peakSPL: 105, subPeakSPL: 115
-    let isIMAXmode = false; // calibrationSPL: 100, peakSPL: 100, subPeakSPL: 115
-    let supportsIMAX = false; // explicit IMAX support variable
-    let modeSubXOMin = 31.5; // highest low of them all
-    let modeSubXOMax = 120; // highest high of them all
-    let modeSpkMin = 20; // lowest low.
-    let modeSpkMax = 20000; // highest high.
-    // Dyslexic Mode
-    let isDyslexicMode = false; // DyslexicMode off by default
+    let isDarkMode = true, isDyslexicMode = false;
+    let isDolbymode = false, isTHXmode = false, isIMAXmode = false, supportsIMAX = false;
+    let modeSubXOMin = 31.5, modeSubXOMax = 120, modeSpkMin = 20, modeSpkMax = 20000;
     // cedia specific
-    let isRP22mode = false; // calibrationSPL: 'performance-based', peakSPL: 105, subPeakSPL: 115
-    let RP22subnminXO;
-    let RP22submaxXO;
-    let RP22subrequiredDelay;
-    let RP22hasAtmos;
-    let RP22hasDTSX;
-    let RP22hasAURO3D;
-    // CREATE ARRAY TO STORE ESTIMATED PLAYBACK LEVELS
-    let estimatedPlaybackLevels = [];
-    // CREATE ARRAY TO STORE ESTIMATED DISTANCES
-    let estimatedDistances = [];
-    // CREATE ARRAY TO STORE FINAL XO'S DISTANCES 
-    let RP22BestXO = [];
+    let isRP22mode = false;
+    let RP22subnminXO, RP22submaxXO, RP22subrequiredDelay, RP22hasAtmos, RP22hasDTSX, RP22hasAURO3D;
+    let estimatedPlaybackLevels = [], estimatedDistances = [], RP22BestXO = [];
     // CONDENCED VERSION
     let AdvancedFilters = false;
     let AdvancedFiltersType = "null";
-    // SPEED DELAY BASED ON CPU CORES LIKE BEFORE
-    // Add delay based on CPU cores ("logical")
-    // Don't have to set speedDelay each time anymore!
+    // SPEED DELAY BASED ON CPU CORES
     var cores = 1;
     const getOptimalDelay = () => {
       cores = navigator.hardwareConcurrency || 1; // Fallback to 1 if undefined
@@ -112,21 +95,11 @@
     };
     let speedDelay = getOptimalDelay();
     // store more AVR default values
-    let lfcSupport;
-    let enMultEQType;
-    let auro;
-    let dolbyVersion;
-    let dynamicEq;
-    let dynamicVolume;
-    let lfc;
-    let subwooferNum;
-    let subwooferLayout;
-    //
-    let hasHeightChannel = false;
-    const heightChannelIds = ["FHL", "RHL", "SHL", "TFL", "TML", "TRL", "BDL", "FDL", "SDL", "TS", "CH"];
-    let isDebugMode = false;
-    const delaymax = 1000.33;
-    let lowFreq, highFreq; // subwoofer values!
+    let lfcSupport, enMultEQType, auro, dolbyVersion, dynamicEq, dynamicVolume, lfc, subwooferNum, subwooferLayout;
+    let hasHeightChannel = false, isDebugMode = false;
+    const heightChannelIds = ["FHL", "RHL", "SHL", "TFL", "TML", "TRL", "BDL", "FDL", "SDL", "TS", "CH"], delaymax = 1000;
+    let lowFreq, highFreq;
+    let IsCustomMeasurements = false;
   </script>
   <!-- partial -->
   <script src="./script.js"></script>
@@ -138,23 +111,18 @@
     <div class="form-container">
       <div class="form-header">
         <div class="theme-toggle">
-          <!--<span class="theme-label">☀️</span>-->
           <div class="toggle-switch active" id="themeToggle">
             <div class="toggle-slider">☀️</div>
           </div>
-          <!--<span class="theme-label">🌙</span>-->
         </div>
 
         <div class="font-toggle">
-          <!--<span class="theme-label">☀️</span>-->
           <div class="toggle-switch active" id="dyslexicToggle">
             <div class="toggle-slider">🔤</div>
           </div>
-          <!--<span class="theme-label">🌙</span>-->
         </div>
 
         <h2><img src="https://www.nvexx.nl/audyssey/nvexx_128.png" class="centerimg" alt="Nvexx logo" />ClariQ Next</h2>
-        <!--<p class="text-muted">Home cinema experience</p>-->
         <noscript>
           <div style="color: red; padding: 10px; border: 1px solid red;">
             JavaScript is disabled in your browser. Please enable it for full functionality.
@@ -192,7 +160,7 @@
             <ul>
               <li>Sub inversion allowed</li>
               <ul>
-                <li>Can or are you willing to physically change subwoofer polarity?</li>
+                <li>Can you or are you willing to physically change subwoofer polarity?</li>
               </ul>
             </ul>
             <ul>
@@ -202,17 +170,28 @@
                 <li>Manual - allows you to go through each step manually. (button clicks)</li>
               </ul>
             </ul>
+            <ul>
+              <li>Advanced Filters</li>
+              <ul>
+                <li>ClariQ Next custom filters including:</li>
+                <ul>
+                  <li>Advanced Dialog Enhancement</li>
+                  <li>Hearing Loss</li>
+                  <li>Gaming</li>
+                </ul>
+              </ul>
+            </ul>
           </div>
 
           <hr />
           <div class="row g-4">
             <div class="col-md-4">
-              <label for="radio_home_cinema">Sub inversion allowed</label><br>
-              <input type="radio" id="radio_home_cinema" name="sub_inversion" value="0" required checked="checked">
+              <label for="sub_inversion_on">Sub inversion allowed</label><br>
+              <input type="radio" id="sub_inversion_on" name="sub_inversion" value="0" required checked="checked">
             </div>
             <div class="col-md-4">
-              <label for="radio_professional_cinema">Sub inversion NOT! allowed!</label><br>
-              <input type="radio" id="radio_professional_cinema" name="sub_inversion" value="1">
+              <label for="sub_inversion_off">Sub inversion NOT! allowed!</label><br>
+              <input type="radio" id="sub_inversion_off" name="sub_inversion" value="1">
             </div>
           </div>
 
@@ -269,12 +248,12 @@
                 Beta) on
                 your computer
                 <ul>
-                  <li class="small-bullet">Download link for the latest REW Beta version: <a
+                  <li class="small-bullet">download link for the latest REW Beta version: <a
                       href="https://www.avnirvana.com/threads/rew-api-beta-releases.12981/" target="_blank">here</a>
                   </li>
                 </ul>
               </li>
-              <li>Choose your preffered Basic settings</li>
+              <li>Choose your preferred basic settings</li>
               <li>When done click the '[.ady]' button below to go to the next step.</li>
             </ul>
           </div>
@@ -295,14 +274,14 @@
               <ul>
                 <li>browse to the Audyssey calibration file (.ady) generated by the MultEQ Editor (IOS/Android) app
                 </li>
-                <li>When prompted, download and 'save' the .zip (measurements) on your computer. Make sure the zip
+                <li>when prompted, download and 'save' the .zip (measurements) on your computer. Make sure the zip
                   file
                   is unblocked: right-click > properties > unblock</li>
-                <li>Start REW, go to the 'EQ' / 'House Curve', and select a target curve of your choice</li>
-                <li>Open the zip file and select ALL (keyboard shortcut: "CTRL+A" for Windows / "Command+A" for Mac)
+                <li>start REW, go to the 'EQ' / 'House Curve', and select a target curve of your choice</li>
+                <li>open the zip file and select ALL (keyboard shortcut: "CTRL+A" for Windows / "Command+A" for Mac)
                   the
                   files in that folder</li>
-                <li>Left click on the selection (inside the .zip file) and drag & drop them onto REW. Wait until all
+                <li>left click on the selection (inside the .zip file) and drag & drop them onto REW. Wait until all
                   measurements are imported
                   and '[SPL Adjustments →]' button is enabled</li>
               </ul>
@@ -338,8 +317,8 @@
                 <path fill-rule="evenodd"
                   d="M7.646 4.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V14.5a.5.5 0 0 1-1 0V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3z" />
               </svg>
-              <p class="mb-1">Drag and drop your .ADY here</p>
-              <p class="text-muted small">or click to browse (.ADY)</p>
+              <p class="mb-1">Drag and drop your .ady here</p>
+              <p class="text-muted small">or click to browse (.ady)</p>
             </div>
           </div>
           <hr />
@@ -352,7 +331,7 @@
                 disabled>
               <ul>
                 <li>Subwoofer -Hz - -Hz / system calculated</li>
-                <li>Speakers -Hz - -kHz / system calculatedd</li>
+                <li>Speakers -Hz - -kHz / system calculated</li>
               </ul>
             </div>
             <div class="col-md-4">
@@ -479,7 +458,10 @@
           <div class="mb-4">
             <ul>
               <li>
-                <span id="target-level-display">Select cinema type to see target level</span>
+                <span id="target-level-display" class="warning">Select cinema type to see target level</span>
+                <ul>
+                  <li>Offset according to the chosen cinema mode </li>
+                </ul>
               </li>
               <li>Makes it easier to read in REW</li>
               <ul>
@@ -506,9 +488,11 @@
                 'Generic/Generic' for all measurements..</li>
               <li>Checking measurement names, indices and sorting</li>
               <ul>
-                <li>Custom sorting if custom measurements are not correctly sorted</li>
+                <li>Custom sorting if custom measurements are not sorted correctly</li>
                 <li>ClariQ Next sorting, the standard REW A-Z sorting doesn't suffice!</li>
               </ul>
+              <li>Sets default target level according to the chosen cinema mode</li>
+              <li>Logs current set optimization parameters</li>
             </ul>
           </div>
           <div class="d-flex justify-content-between mt-4">
@@ -522,11 +506,28 @@
           <h3 class="mb-4">Groundworks</h3>
           <div class="mb-4">
             <ul>
-              <li>Optimizes speaker volume & time alignment</li>
+              <li>Sets initial trims using mlp measurements</li>
+              <li>Time align speakers</li>
+              <li>Initialize subwoofer(s) and converts 'directional bass' mode to 'standard bass'</li>
+              <ul>
+                <li>for multi-subwoofer setups</li>
+                <li>properly aligns multi-subwoofer setups</li>
+              </ul>
               <ul>
                 <li>based on #measurement count per speaker (microphone positions)</li>
               </ul>
-              <li>Aligns multi-subwoofer setups</li>
+              <li>Spatial averaging of speakers and subwoofers</li>
+              <li>normalizes trim levels (ClariQ Next !)</li>
+              <ul>
+                <li>based on cinema mode chosen</li>
+                <li>makes sure trim levels are correct for modes that have a SPL of 75+db</li>
+                <ul>
+                  <li>Dolby mode (82dB -SPL)</li>
+                  <li>Cedia RP22 mode (85dB -SPL)</li>
+                  <li>THX mode (85dB -SPL)</li>
+                  <li>IMAX mode (100dB -SPL)</li>
+                </ul>
+              </ul>
             </ul>
           </div>
           <div class="d-flex justify-content-between mt-4">
@@ -541,11 +542,15 @@
           <div class="mb-4">
             <ul>
               <li>Calculates speaker(s) -3dB points against target curve</li>
+              <li>Calculates High Frequency rolloffs</li>
               <ul>
-                <li>calculates availble bandwidth</li>
-                <li>sets "estimated" XO range based on available bandwidth</li>
+                <li>Depending on the cinema mode chosen</li>
                 <ul>
-                  <li>can be a bit optimisitc, can be adjusted by using the slider range</li>
+                  <li>Dolby mode - 16000Hz rolloff</li>
+                  <li>Cedia RP22 mode - 15000Hz rolloff</li>
+                  <li>THX mode - 20000Hz rolloff</li>
+                  <li>IMAX mode - 20000Hz rolloff</li>
+                  <li>default - calculates rolloff</li>
                 </ul>
               </ul>
             </ul>
@@ -562,9 +567,21 @@
           <div class="mb-4">
             <ul>
               <li>Calculates subwoofer(s) -3dB points against target curve</li>
+              <li>Calculates low frequency rolloffs</li>
               <ul>
-                <li>calculates availble bandwidth</li>
-                <li>sets appropriate XO range based on available bandwidth</li>
+                <li>Depending on the cinema mode chosen</li>
+                <ul>
+                  <li>Dolby mode - 16000Hz rolloff</li>
+                  <li>Cedia RP22 mode - 15000Hz rolloff</li>
+                  <li>THX mode - 20000Hz rolloff</li>
+                  <li>IMAX mode - 20000Hz rolloff</li>
+                  <li>default - calculates rolloff</li>
+                </ul>
+              </ul>
+              <li>calculates availble bandwidth</li>
+              <li>sets "estimated" XO range based on available bandwidth</li>
+              <ul>
+                <li>can be adjusted by using the slider range</li>
               </ul>
             </ul>
           </div>
@@ -579,10 +596,26 @@
           <h3 class="mb-4">Generate filters</h3>
           <div class="mb-4">
             <ul>
-              <li>Generates minimum phase EQ filters</li>
+              <li class="warn">ClariQ Next PROPRIETARY FILTER GENERATION AND CHECKING !</li>
+            </ul>
+            <ul>
+              <li class="warn">ClariQ Next SBIR detection before filter generation</li>
               <ul>
-                <li>generates the filter you will see in the Audyssey app once the .ady is uploaded</li>
-                <li>includes auto-level offset</li>
+                <li>not 100% yet</li>
+                <li>good indication of expected SBIR</li>
+                <li>logs and gives an overview of expected nulls</li>
+              </ul>
+            </ul>
+            <ul>
+              <li class="warn">ClariQ Next SBIR filter optimizations</li>
+              <ul>
+                <li>Checks REW generated filters</li>
+                <li>we don't want to boost above +3dB as we can't fix nulls with EQ!</li>
+                <li>we don't want to cut more than -10dB as we can't fix nulls with EQ!</li>
+                <li>logs and gives an overview of active REW generated filters</li>
+                <li>logs and gives an overview of any BOOST VIOLATION FOUND</li>
+                <li>logs and gives an overview of any CUT VIOLATION FOUND</li>
+                <li>automatically corrects the filters to stay within +3dB and -10dB</li>
               </ul>
             </ul>
           </div>
@@ -619,7 +652,7 @@
               <li>Optimize subwoofer(s) delay(s)</li>
               <ul>
                 <li>Calculates the optimal subwoofer delay for ALL speakers using average initial calculated XO</li>
-                <li>Calculates the optimal subwoofer delay within the Available delay range</li>
+                <li>Calculates the optimal subwoofer delay within the available delay range</li>
                 <li>takes into account the "Sub inversion allowed" option</li>
               </ul>
             </ul>
@@ -638,7 +671,6 @@
               <li>Finalize calculated distances</li>
               <ul>
                 <li>speaker & subwoofer distances</li>
-                <li>takes into account the "Sub inversion allowed" option</li>
               </ul>
             </ul>
           </div>
@@ -653,7 +685,7 @@
           <h3 class="mb-4">Finalize crossovers</h3>
           <div class="mb-4">
             <ul>
-              <li>Finalize crossovers based on Usable XO range</li>
+              <li>Finalize crossovers based on usable XO range</li>
               <ul>
                 <li>based on (combined subwoofer bandwidth + slider range)</li>
               </ul>
@@ -671,7 +703,7 @@
           <div class="mb-4">
             <ul>
               <li>Generating expected final outputs for each channel.</li>
-              <li>Updating REW reults to reflect the expected final outputs for each channel.</li>
+              <li>Updating REW results to reflect the expected final outputs for each channel.</li>
             </ul>
           </div>
           <div class="d-flex justify-content-between mt-4">
@@ -686,7 +718,7 @@
           <div class="mb-4">
             <ul>
               <li>Constructing .ady files</li>
-              <li>generating final trims for .ady file</li>
+              <li>Generating final trims for .ady file</li>
               <li>Generating CEDIA RP22 report</li>
             </ul>
           </div>
@@ -695,10 +727,8 @@
             <!--<button type="button" class="btn btn-primary btn-nav next-step">Continue →</button>-->
           </div>
         </div>
-
       </form>
       <pre id="logContainer"></pre>
-
       <br />
       <br />
       <div class="row g-4">
@@ -757,6 +787,9 @@
             freqIndex.push(70);
             supportsIMAX = true;
           }
+          if (modelsDirac.includes(model)) {
+            DiracEnabled = true;
+          }
           freqIndex.sort(function (a, b) { return a - b; });
           Object.freeze(freqIndex);
           console.log(`Speed of sound setting has been automatically adjusted for your ${modelName} at ${sOs} m/s.`);
@@ -795,7 +828,6 @@
           subHiTrim = -Infinity;
           subLoDelay = Infinity;
           subHiDelay = -Infinity;
-
           console.info("");
           console.info("title:", jsonData.title);
           console.info("enAmpAssignType:", jsonData.enAmpAssignType);
@@ -817,11 +849,17 @@
           console.info("subwooferMode:", jsonData.subwooferMode);
           console.info("subwooferLayout:", jsonData.subwooferLayout);
           console.info("measurementsPerPosition:", jsonData.measurementsPerPosition);
-
-
           // console.info("detectedChannels ")
           // log the full detected channels list in one line
           console.info("detectedChannels", jsonData.detectedChannels.map(ch => ch.commandId).join(","));
+          //
+          // Populate commandId array with 1-based indexing
+          jsonData.detectedChannels.forEach((channel, index) => {
+            if (channel.commandId) {
+              commandId[index + 1] = channel.commandId; // 1-based indexing
+              console.info(`commandId[${index + 1}]: ${channel.commandId}`);
+            }
+          });
           console.info("");
           jsonData.detectedChannels.forEach(channel => {
 
@@ -933,16 +971,13 @@
             const measurements = await fetch_mREW();
             let mCount = Object.keys(measurements).length;
             if (isCirrusLogic) (mCount--);
-
             // Always validate measurement names against ADY file (regardless of count)
             try {
               const expectedMeasurements = new Set();
-
               // Extract expected measurement names from ADY
               jsonData.detectedChannels.forEach(channel => {
                 const commandId = channel.commandId;  // e.g., "FL"
                 const channelIndices = Object.keys(channel.responseData); // e.g., ["0", "1", "2"]
-
                 // Generate expected REW names: FL0, FL1, FL2
                 channelIndices.forEach(index => {
                   expectedMeasurements.add(`${commandId}${index}`);
@@ -954,18 +989,14 @@
               for (let i = 1; i <= mCount; i++) {
                 actualMeasurements.add(measurements[i].title);
               }
-
               // Find discrepancies
               const missing = [...expectedMeasurements].filter(name => !actualMeasurements.has(name));
               const extra = [...actualMeasurements].filter(name => !expectedMeasurements.has(name));
-
               // Create current validation state for comparison
               const currentValidationState = JSON.stringify({ missing, extra, mCount });
-
               // Show validation messages on first run OR if state changed
               if (isFirstValidation || currentValidationState !== lastValidationState) {
                 console.infoUpdate("Validating REW measurements against ADY file...");
-
                 // Report findings
                 if (missing.length === 0 && extra.length === 0) {
                   console.infoUpdate("✓ All REW measurements match ADY file expectations");
@@ -982,7 +1013,6 @@
                 lastValidationState = currentValidationState;
                 isFirstValidation = false;
               }
-
             } catch (error) {
               console.warn("Could not validate measurement names against ADY file:", error.message);
             }
@@ -994,12 +1024,9 @@
               for (let i = 1; i <= mCount; i++) {
                 importedMeasurements.push(measurements[i].title);
               }
-
               // Original success logic
-              // document.getElementById("button2").disabled = false;
               console.infoUpdate(`All ${isCirrusLogic ? mCount + 1 : mCount} measurements have now been successfully imported!`);
               console.infoUpdate(`Successfully imported measurements: ${importedMeasurements.join(', ')}`);
-
               // communicate with script.js
               window.measurementsImported = true;
               window.updateContinueButtonState();
@@ -1050,7 +1077,6 @@
       // Helper function to set target level based on configuration
       function setTargetLevel(targetLevel, isCirrusLogic) {
         const validLevel = VALID_TARGET_LEVELS.includes(targetLevel) ? targetLevel : DEFAULT_TARGET_LEVEL;
-
         // Note: The original logic sets the same value regardless of isCirrusLogic flag
         // This suggests the flag might be for future use or legacy code
         return parseFloat(validLevel);
@@ -1087,6 +1113,7 @@
 
           default:
             console.warn(`Custom measurements detected. SPL offset: ${offset}dB`);
+            IsCustomMeasurements = true;
             return setTargetLevel(targetLevel, isCirrusLogic);
         }
       }
@@ -1113,48 +1140,35 @@
         try {
           // Setup operations
           await performSetupOperations(speedDelay);
-
-          console.log("##################");
-          console.log("## CorrectSPL() ##");
-          console.log("##################");
-
           // Fetch measurements
           const measurements = await fetch_mREW();
-
           // Validate measurements
           if (!measurements || !measurements[1]) {
             throw new Error("Invalid measurements data");
           }
-
           // Get measurement count
           const measurementIds = Object.keys(measurements).filter(key => !isNaN(key));
           console.log(`Found ${measurementIds.length} measurements to check`);
-
           // Process SPL offset and set target level
           const splOffsetdB = measurements[1].splOffsetdB;
           if (splOffsetdB === undefined) {
             throw new Error("SPL offset not found in measurements");
           }
-
           isCirrusLogictargetLevel = handleSplOffset(
             splOffsetdB,
             measurements,
             targetLevel,
             isCirrusLogic
           );
-
           console.log(`Target level set to: ${isCirrusLogictargetLevel}dB`);
-
         } catch (error) {
           console.error("Error in CorrectSPL:", error.message);
-
           // Handle specific error types
           if (error.message.includes("Unsupported measurement type")) {
             isAutoMode = false;
             isScriptRunning = false;
             process.exit(1);
           }
-
           // Re-throw other errors for higher-level handling
           throw error;
         }
@@ -1195,22 +1209,24 @@
         const measurements = await fetch_mREW();
         const mCount = Object.keys(measurements).length;
         for (let i = 1; i < mCount; i++) {
+          const name = measurements[i].title;
+          console.infoUpdate(`Applying Audyssey microphone calibration file to ${name}...`);
           const irWindows = await fetchSafe('ir-windows', i);
           const leftW = parseFloat(irWindows.leftWindowWidthms);
           const rightW = parseFloat(irWindows.rightWindowWidthms);
           const refTime = parseFloat(irWindows.refTimems);
           await postNext('Arithmetic', [i, mCount], { function: "A * B" });
           await postSafe(`${baseUrl}/${mCount + i}/ir-windows`, { leftWindowWidthms: leftW, rightWindowWidthms: rightW, refTimems: refTime }, "Update processed");
-          const name = measurements[i].title;
           await fetch_mREW(mCount + i, 'PUT', { title: name });
         }
+        console.infoUpdate("Deleting processed measurements...");
         for (let i = mCount; i >= 1; i--) {
           await postDelete(i);
         }
         console.infoUpdate("Completed applying Audyssey microphone calibration file to measurements.");
       }
 
-      // Add this debugging function to help troubleshoot the user's specific environment
+      // Debugging function to help troubleshoot the user's specific environment
       async function debugUserEnvironment() {
         console.log("=== USER ENVIRONMENT DEBUG ===");
 
@@ -1444,10 +1460,18 @@
         }
 
         if (freqIndex.includes(180)) {
-          console.info("  AVR supports 180Hz");
+          console.warn("  AVR supports 180Hz");
         }
         if (freqIndex.includes(70)) {
-          console.info("  AVR supports IMAX 70Hz");
+          console.warn("  AVR supports IMAX 70Hz");
+        }
+
+        if (DiracEnabled == true) {
+          console.warn("  AVR supports Dirac");
+          console.warn("  AVR max distance set to 18m");
+        } else {
+          console.info("  AVR does not! supports Dirac");
+          console.info("  AVR max distance set to 6m");
         }
 
         if (noInversion) {
@@ -1773,7 +1797,7 @@
               }
             };
 
-            console.infoUpdate("ClariQ Next sorting and re-indexing completed successfully.");
+            console.info("ClariQ Next sorting and re-indexing completed successfully.");
             enableGraph();
 
           } catch (error) {
@@ -1904,7 +1928,10 @@
       function getDelayHeadroom(startIdx, endIdx) {
         const minM = Math.min(...mSec.slice(startIdx, endIdx + 1));
         const maxM = Math.max(...mSec.slice(startIdx, endIdx + 1));
-        const limInsec = 6 / sOs;
+
+        const maxDist = DiracEnabled === true ? 18 : 6;
+        const limInsec = maxDist / sOs;
+
         const msecMin = maxM - limInsec;
         const msecMax = minM + limInsec;
         const maxNegative = msecMin * delaymax;
@@ -1955,126 +1982,285 @@
         let mCount = Object.keys(measurements).length;
         const micPositions = mCount / (nSpeakers + nSubs);
 
+        if (bassMode === "Directional") {
+          console.info(`'Directional bass' mode with '${swChannelCount}' subwoofers detected.`);
+        }
         if (bassMode != "Directional" && swChannelCount > 1) {
           bassMode = "Standard";
           console.info(`'Standard bass' mode with '${swChannelCount}' subwoofers detected.`);
         }
-
         if (bassMode != "Directional" && swChannelCount === 1) {
           bassMode = "Standard";
           console.info(`'Standard bass' mode with '${swChannelCount}' subwoofer detected.`);
         }
 
-        console.log(`Optimizing speaker volume & time alignment using <${micPositions}> different microphone positions...`);
-        console.info(`Starting...`);
-        measurements = await fetch_mREW();
-        mCount = Object.keys(measurements).length;
+        console.log("Optimizing spatial averaging, volume & time alignment...");
+
+        // STEP 1: Initialize Trims using MLP measurements only
+        console.info("Initializing trims...");
         let count = 1;
         let title = {};
+
         for (let i = 1; i <= mCount; i += micPositions) {
-          console.infoUpdate(`Computing optimal spatial averaging configuration for speaker #${(i - 1) / micPositions + 1}`)
+          const indices = Array.from({ length: micPositions }, (_, j) => i + j);
+          title[count] = measurements[i].title.slice(0, -1) + "o";
+
+          // trim determination using the MLP measurement ONLY (indices[0])
+          const mlpIndex = indices[0]; // This is the MLP measurement (C0, FHL0, etc.)
+          console.info(`├─ Calculating MLP trim for channel ${count}: ${title[count]} (using MLP measurement index ${mlpIndex} - ${measurements[mlpIndex].title})`);
+
+          if (title[count].startsWith("SW")) {
+            customLevel[count] = await getSubTrim(mlpIndex);
+          } else {
+            customLevel[count] = await getSpeakerTrim(mlpIndex);
+          }
+          console.log(`├─ MLP trim result for ${title[count]}: ${customLevel[count]}dB`);
+
+          // shift all measurements for this channel based on MLP trim
+          for (let j = 0; j < indices.length; j++) {
+            await postNext('Add SPL offset', indices[j], { offset: customLevel[count] });
+          }
+
+          // attempt to fix android volume bug where measurements are off by multiples of +/-6dB
+          if (isCirrusLogic && IsCustomMeasurements == false) {
+            await fixVolBug(indices);
+          }
+
+          count++;
+        }
+        console.info("Initialized trims.");
+
+        // STEP 2: Time align speakers
+        console.info("Time aligning speakers...");
+        const mlpSPIndices = [];
+        const mlpSWIndices = [];
+
+        // Build MLP indices arrays based on current data structure
+        count = 1;
+        for (let i = 1; i <= mCount; i += micPositions) {
+          if (title[count].startsWith("SW")) {
+            mlpSWIndices.push(i); // MLP subwoofer measurement
+          } else {
+            mlpSPIndices.push(i); // MLP speaker measurement  
+          }
+          mSec[count] = 0; // initialize
+          count++;
+        }
+
+        console.info(`├─ MLP Speaker indices: [${mlpSPIndices.join(', ')}]`);
+        console.info(`├─ MLP Subwoofer indices: [${mlpSWIndices.join(', ')}]`);
+
+        // calculate the average IR start delay for normalization
+        measurements = await fetch_mREW();
+        let IRStartDelay = 0;
+        for (let i = 0; i < mlpSPIndices.length; i++) {
+          IRStartDelay += measurements[mlpSPIndices[i]].timeOfIRStartSeconds;
+        }
+        IRStartDelay /= nSpeakers;
+        console.info(`├─ Average IR start delay: ${IRStartDelay.toFixed(6)}s`);
+
+        // time align & normalize speaker delays
+        await postNext('Time align', mlpSPIndices);
+        measurements = await fetch_mREW();
+        for (let i = 0; i < mlpSPIndices.length; i++) {
+          mSec[i + 1] = IRStartDelay - measurements[mlpSPIndices[i]].cumulativeIRShiftSeconds;
+          console.info(`├─ Speaker ${i + 1} delay: ${mSec[i + 1].toFixed(6)}s`);
+        }
+
+        // shift subwoofer IRs by the same offset used to normalize speaker delays
+        // note: this ensures relative delay of SW compared to speakers stay intact
+        for (let i = 0; i < mlpSWIndices.length; i++) {
+          await postNext('Offset t=0', mlpSWIndices[i], { offset: IRStartDelay, unit: "seconds" });
+          console.info(`├─ Applied ${IRStartDelay.toFixed(6)}s offset to subwoofer MLP measurement ${mlpSWIndices[i]}`);
+        }
+        console.info("Time aligned speakers.");
+
+        // STEP 3: Initialize Subwoofers
+        if (noSub) { return; }
+
+        if (bassMode === "Directional") {
+          console.warn("Your system will now be converted to 'standard bass' mode for a better sound experience...");
+          await directional2standard();
+          console.warn("Conversion from 'directional bass' mode to 'standard bass' mode completed.");
+
+          // CRITICAL FIX: After directional2standard(), update measurements and title array
+          measurements = await fetch_mREW();
+          mCount = Object.keys(measurements).length;
+          console.info(`├─ Post-directional2standard measurement count: ${mCount}`);
+
+          // Rebuild title array to match new measurement structure
+          // After directional2standard(), we should have: speakers + 1 combined subwoofer
+          const newTitle = {};
+          count = 1;
+
+          // Keep speaker titles unchanged
+          for (let i = 1; i <= nSpeakers; i++) {
+            newTitle[i] = title[i];
+          }
+
+          // Add single combined subwoofer title
+          newTitle[nSpeakers + 1] = "SW1o";
+
+          // Update global state
+          title = newTitle;
+          nSubs = 1; // Now we have only 1 combined subwoofer
+
+          console.info(`├─ Updated title array for combined subwoofer: [${Object.keys(title).map(k => `${k}:"${title[k]}"`).join(', ')}]`);
+          console.info(`├─ Updated nSubs to: ${nSubs}`);
+
+        } else {
+          // normalize standard bass subwoofer median IR to t=0
+          const IROffset = (subLoDelay + subHiDelay) / 2;
+
+          // Find the subwoofer MLP index (equivalent to cmdIdMeasurements[commandId[nChannels]][0])
+          let stdSubMLPIdx = null;
+          count = 1;
+          for (let i = 1; i <= mCount; i += micPositions) {
+            if (title[count].startsWith("SW")) {
+              stdSubMLPIdx = i; // This is the MLP measurement for the subwoofer
+              break;
+            }
+            count++;
+          }
+
+          if (stdSubMLPIdx) {
+            await postNext('Offset t=0', stdSubMLPIdx, { offset: IROffset, unit: "seconds" });
+            mSec[nChannels] -= IROffset;
+            console.info(`├─ Applied ${IROffset.toFixed(6)}s IROffset to subwoofer MLP measurement ${stdSubMLPIdx}`);
+          }
+        }
+
+        // align combined subwoofer median IR to median IR of speakers
+        // note: this ensures min/max delays are negative/positive, otherwise REW crashes
+        const loSPDelay = Math.min(...mSec.slice(1, nSpeakers + 1));
+        const hiSPDelay = Math.max(...mSec.slice(1, nSpeakers + 1));
+        const medianSPDelay = (loSPDelay + hiSPDelay) / 2;
+        console.info(`├─ Speaker delay range: ${loSPDelay.toFixed(6)}s to ${hiSPDelay.toFixed(6)}s (median: ${medianSPDelay.toFixed(6)}s)`);
+
+        // Find subwoofer MLP index and apply median speaker delay offset (equivalent to SWIndices[0])
+        count = 1;
+        for (let i = 1; i <= mCount; i += micPositions) {
+          if (title[count].startsWith("SW")) {
+            await postNext('Offset t=0', i, { offset: -medianSPDelay, unit: "seconds" });
+            console.info(`├─ Applied ${(-medianSPDelay).toFixed(6)}s offset to subwoofer MLP measurement ${i}`);
+
+            // Check response variation if multiple microphone positions (equivalent to SWIndices.length > 1)
+            if (micPositions > 1 && typeof calculateMaxDeltaOfResponses !== 'undefined') {
+              const SWIndices = Array.from({ length: micPositions }, (_, j) => i + j);
+              const SWMaxDelta = await calculateMaxDeltaOfResponses(SWIndices, 30, 80);
+              console.log(`├─ ${title[count]} response variation between ${SWIndices.length} microphone positions: ±${(SWMaxDelta / 2).toFixed(2)}dB`);
+            }
+            break;
+          }
+          count++;
+        }
+
+        // Update subwoofer delays
+        for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+          mSec[i] += medianSPDelay;
+        }
+
+        // STEP 4: Spatial Average
+        console.info("Starting spatial averaging...");
+        measurements = await fetch_mREW();
+        mCount = Object.keys(measurements).length;
+        const originalMCount = mCount; // Store original count
+
+        // Use the original micPositions calculation - it should still be correct
+        const currentChannels = nSpeakers + nSubs;
+
+        console.info(`├─ Total measurements: ${mCount}, Current channels: ${currentChannels}`);
+        console.info(`├─ Using original mic positions: ${micPositions}`);
+        console.info(`├─ Title array contents: [${Object.keys(title).map(k => `${k}:"${title[k]}"`).join(', ')}]`);
+
+        count = 1;
+
+        for (let i = 1; i <= originalMCount; i += micPositions) {
+          // Safety check: don't process beyond available titles
+          if (count > currentChannels || !title[count]) {
+            console.warn(`├─ Stopping spatial averaging - no more channels to process (count: ${count}, max: ${currentChannels})`);
+            break;
+          }
+
+          console.infoUpdate(`🔊 Computing optimal spatial averaging configuration for channel ${count}/${currentChannels} (${title[count]})`);
           const indices = Array.from({ length: micPositions }, (_, j) => i + j);
 
-          console.info(`📍 Processing microphone positions: indices [${indices.join(', ')}]`)
+          console.info(`├─ Processing microphone positions: indices [${indices.join(', ')}]`)
 
           if (micPositions > 1) {
-            console.info(`🔄 Cross-correlating ${micPositions} microphone positions...`);
+            console.info(`├─ Cross-correlating ${micPositions} microphone positions...`);
             await postNext('Cross corr align', indices);
-            console.log(`✅ Cross-correlation alignment completed`);
+            console.log(`├─ Cross-correlation alignment completed`);
           }
-          mSec[count] = 0;
-          title[count] = measurements[i].title.slice(0, -1) + "o";
-          console.info(`🎯 Calculating trim for MLP (Main Listening Position) - Index ${i}`)
-          if (title[count].startsWith("SW")) {
-            console.info(`MLP (Main Listening Position) measurement for: ${title[count]}`);
-            customLevel[count] = await getSubTrim(i);
-          } else {
-            console.info(`MLP (Main Listening Position) measurement: ${title[count]}`);
-            customLevel[count] = await getSpeakerTrim(i);
-          }
-          console.info(`📊 MLP trim result: ${customLevel[count]}dB`);
+
+          let newMeasurementResult;
           if (micPositions === 1) {
-            console.info(`📋 Single microphone position - copying measurement`);
-            await postSafe(`${baseUrl}/${i}/command`, { command: "Response copy" }, "Completed"); // nothing to average
+            console.info(`├─ Single microphone position - copying measurement`);
+            newMeasurementResult = await postSafe(`${baseUrl}/${i}/command`, { command: "Response copy" }, "Completed");
           } else {
-            console.info(`🧮 Averaging ${micPositions} microphone positions...`);
-            await postNext('Magn plus phase average', indices); // do not use VA, it reduces SPL!
-            console.info(`✅ Spatial averaging completed for ${micPositions} positions`);
+            console.info(`├─ Averaging ${micPositions} microphone positions...`);
+            newMeasurementResult = await postNext('Magn plus phase average', indices);
+            console.log(`├─ Spatial averaging completed for ${micPositions} positions`);
           }
-          // the "o" measurement
-          const idx = mCount + count;
-          await fetch_mREW(idx, 'PUT', { title: title[count] });
 
-          console.info(`📝 Created averaged measurement: Index ${idx} - "${title[count]}"`);
-          console.info(`🎯 Calculating trim for averaged result - Index ${idx}`);
+          // Get the actual index of the newly created measurement
+          let newMeasurementIdx;
+          if (newMeasurementResult && newMeasurementResult.results) {
+            // Extract the new measurement index from the result
+            const resultKeys = Object.keys(newMeasurementResult.results);
+            newMeasurementIdx = parseInt(resultKeys[0]);
+            console.info(`├─ Got measurement index ${newMeasurementIdx} from operation result`);
+          } else {
+            // Fallback: refresh measurements and find the newest one
+            const freshMeasurements = await fetch_mREW();
+            const freshMCount = Object.keys(freshMeasurements).length;
+            newMeasurementIdx = freshMCount; // Newest measurement should be the last index
+            console.info(`├─ Using fallback measurement index ${newMeasurementIdx} (latest measurement)`);
+          }
+
+          console.info(`├─ Created averaged measurement: Index ${newMeasurementIdx} - target title: "${title[count]}"`);
+
+          // Update the measurement title
+          await fetch_mREW(newMeasurementIdx, 'PUT', { title: title[count] });
+
+          console.info(`├─ Calculating trim for averaged result - Index ${newMeasurementIdx}`);
           // o vs target curve
-          const volAdjust = title[count].startsWith("SW") ? await getSubTrim(idx) : await getSpeakerTrim(idx);
-          console.info(`📊 Averaged trim result: ${volAdjust}dB`);
+          const volAdjust = title[count].startsWith("SW") ? await getSubTrim(newMeasurementIdx) : await getSpeakerTrim(newMeasurementIdx);
+          console.log(`├─ Averaged trim result: ${volAdjust}dB`);
 
-          await postNext('Add SPL offset', idx, { offset: volAdjust });
-          console.info(`🔧 Applied ${volAdjust}dB SPL offset to averaged measurement`);
+          await postNext('Add SPL offset', newMeasurementIdx, { offset: volAdjust });
+          console.info(`└─ Applied ${volAdjust}dB SPL offset to averaged measurement`);
           console.info(`─────────────────────────────────────────────────────────`);
           // go to next channel
           count++;
         }
 
         console.infoUpdate("Deleting processed measurements...");
-        for (let i = mCount; i >= 1; i--) {
+        // Get current measurement count for cleanup
+        measurements = await fetch_mREW();
+        const finalMCount = Object.keys(measurements).length;
+        const numAveragedMeasurements = nSpeakers + nSubs;
+
+        // Delete original measurements (keep the averaged ones)
+        for (let i = originalMCount; i >= 1; i--) {
           await postDelete(i);
         }
+
         for (let i = 1; i <= nSpeakers + nSubs; i++) {
           commandId[i] = title[i].slice(0, -1);
-        }
-        console.infoUpdate("Time aligning speakers...");
-        // align speakers but leave subwoofers alone. ANY align command messes up subwoofer IR alignment
-        const spIndices = Array.from({ length: nSpeakers }, (_, j) => j + 1);
-        await postNext('Time align', spIndices);
-        measurements = await fetch_mREW();
-        // calculate audyssey IR start delay
-        let totalIRShift = 0;
-        for (let i = 1; i <= nSpeakers; i++) {
-          totalIRShift += parseFloat(measurements[i].cumulativeIRShiftSeconds);
-        }
-        // determine relative delays and remove audyssey IR start delay
-        const IRStartDelay = totalIRShift / nSpeakers;
-        for (let i = 1; i <= nSpeakers; i++) {
-          mSec[i] -= (parseFloat(measurements[i].cumulativeIRShiftSeconds) - IRStartDelay);
         }
 
         // Normalize Trim levels targetLevel vs 75dB
         normalizeTrimLevels();
+        console.info("Completed averaging, volume & time alignment!");
 
-        console.infoUpdate("Completed averaging, volume & time alignment!");
-        // no need to go further without subwoofer
+        // Final subwoofer processing
         if (noSub) { return; }
-        // remove audyssey IR start delay from subwoofers
-        for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
-          await postNext('Offset t=0', i, { offset: IRStartDelay, unit: "seconds" });
-        }
-        if (bassMode === "Directional") {
-          console.warn("Your system will now be converted to 'standard bass' mode for a better sound experience...");
-          await directional2standard();
-          console.warn("Conversion from 'directional bass' mode to 'standard bass' mode completed.")
-        }
-        else {
-          // normalize standard bass subwoofer median IR to t=0
-          const IROffset = (subLoDelay + subHiDelay) / 2;
-          await postNext('Offset t=0', nChannels, { offset: IROffset, unit: "seconds" });
-          mSec[nChannels] -= IROffset;
-        }
-        // align final subwoofer median IR to median IR of speakers
-        // note: this ensures min/max delays are negative/positive, otherwise REW crashes
-        const loSPDelay = Math.min(...mSec.slice(1, nSpeakers + 1));
-        const hiSPDelay = Math.max(...mSec.slice(1, nSpeakers + 1));
-        const medianSPDelay = (loSPDelay + hiSPDelay) / 2;
-        await postNext('Offset t=0', nChannels, { offset: -medianSPDelay, unit: "seconds" });
-        for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
-          mSec[i] += medianSPDelay;
-        }
-        // done with groundworks and log
+
         const [loDelay, hiDelay] = getDelayRangeOfFinalSub();
         console.info(`Available bass system volume adjustment range → { ${subLoTrim}dB : ${subHiTrim}dB }`);
         console.info(`Total subwoofer 'delay headroom' available → ${(hiDelay - loDelay).toFixed(2)}ms`);
+
         const dynamicBassFilldB = await getDynamicBassFill(nChannels);
         if (dynamicBassFilldB != 0) {
           console.warn(`***Adding ${dynamicBassFilldB}dB dynamic bass fill to compensate for dips!***`);
@@ -2084,6 +2270,25 @@
           }
           await postNext('Add SPL offset', nChannels, { offset: dynamicBassFilldB });
         }
+      }
+
+      async function calculateMaxDeltaOfResponses(indices, start, end) {
+        if (indices.length <= 1) { return 0; }
+        const responseArrays = [];
+        for (let i = 0; i < indices.length; i++) {
+          const freqResponse = await fetchSafe("frequency-response?smoothing=Psy&ppo=96", indices[i]);
+          const freqArray = response2array(freqResponse, start, end);
+          responseArrays.push(freqArray);
+        }
+        // find the max difference in SPL across the responses
+        let maxDelta = 0;
+        for (let i = 0; i < responseArrays[0].length; i++) {
+          const points = responseArrays.map(row => row[i]);
+          const minVal = Math.min(...points);
+          const maxVal = Math.max(...points);
+          maxDelta = Math.max(maxVal - minVal, maxDelta);
+        }
+        return maxDelta;
       }
 
       async function getALOffset(idx, isSub) {
@@ -2327,7 +2532,7 @@
           //
           // await fetchSafe('target-level', i, targetLevel);
           /* Commit f594500 */
-          const tcLevelOffset = isSub ? 0 : await getTCTrim(i, 200, 2000);
+          const tcLevelOffset = isSub ? 0 : await getTCTrim(i, 200, 2000); // getTCTrim already uses Var
           await fetchSafe('target-level', i, targetLevel - tcLevelOffset);
           /* Commit f594500 */
           await postNext('Smooth', i, { smoothing: "Var" });
@@ -2370,6 +2575,9 @@
           try {
             const filters = await getFilters(i);
             const violations = sanityCheck(filters);
+            // const violations = sanityCheck(filters, i);
+
+
             if (violations) {
               const boostViolations = violations.filter(v => v.currentGain > 3).length;
               const cutViolations = violations.filter(v => v.currentGain < -10).length;
@@ -2384,7 +2592,28 @@
 
               await updateFilters(i, violations);
             }
+
+            /*
+            if (violations) {
+              const boostViolations = violations.filter(v => v.violationType === 'BOOST').length;
+              const cutViolations = violations.filter(v => v.violationType === 'CUT').length;
+              const xoViolations = violations.filter(v => v.violationType === 'BELOW_XO').length;
+
+              const msgs = [];
+              if (boostViolations) msgs.push(`${boostViolations} boost`);
+              if (cutViolations) msgs.push(`${cutViolations} cut`);
+              if (xoViolations) msgs.push(`${xoViolations} below-crossover`);
+
+              console.warn(`${commandId[i]} - Fixed violations: ${msgs.join(', ')}`);
+
+              await updateFilters(i, violations);
+            }
+            */
+
+            // ADD THIS SBIR CHECK RIGHT HERE:
+            await checkAndDisableSBIRFilters(i, filters);
           }
+
           catch (error) {
             console.debug(`${commandId[i]} - Sanity check failed:`, error);
           }
@@ -2497,7 +2726,6 @@
           }
           console.infoUpdate(logUpdate);
         }
-
         // clean up EQ params
         for (let i = nChannels + 1; i <= nChannels * 3; i++) {
           await postSafe(`${baseUrl}/${i}/target-settings`, { shape: "None" }, "Update processed");
@@ -2515,13 +2743,15 @@
       function sanityCheck(filters) {
         const violations = [];
 
+        // Filter out inactive filters (type = "None")
+        const activeFilters = filters.filter(filter => filter.type !== "None");
+
         // Header logging
         console.log(`🔍 VALIDATING REW-GENERATED FILTERS...`);
-        console.log(`📊 Found ${filters.length} REW-generated filters to validate:`);
+        console.log(`├─ Found ${activeFilters.length} active filters (of ${filters.length} slots):`);
 
-        filters.forEach(filter => {
+        activeFilters.forEach(filter => {
           if (filter.hasOwnProperty('gaindB')) {
-
             // Build detailed filter description
             let filterDesc = `Filter ${filter.index}: ${filter.type}`;
 
@@ -2536,7 +2766,7 @@
             }
 
             // Log the detailed filter info
-            console.info(`   ${filterDesc}`);
+            console.info(`├─ ${filterDesc}`);
 
             let violation = null;
             const originalGain = filter.gaindB;
@@ -2557,14 +2787,14 @@
               console.warn(`*** ${violation} VIOLATION FOUND: Filter ${filter.index} corrected to ${filter.gaindB}dB`);
               violations.push({
                 index: filter.index,
-                currentGain: originalGain,  // ← Use original violating value
+                currentGain: originalGain,
                 filter: filter
               });
             }
           }
         });
 
-        console.log(`Total violations found: ${violations.length}`);
+        console.log(`└─ Total violations found: ${violations.length}`);
         return violations.length > 0 ? violations : null;
       }
 
@@ -2589,6 +2819,178 @@
           console.log(`Filter ${violation.filter.index} updated:`, result.message);
         }
       }
+
+      // Main SBIR detection
+      async function detectSBIRFromMeasurements() {
+        console.log("Analyzing for Speaker Boundary Interference Response (SBIR)...");
+
+        const c = sOs;
+        const sbirPatterns = [];
+
+        for (let i = 1; i <= nSpeakers; i++) {
+          const title = commandId[i];
+          console.info(`Analyzing ${title} for SBIR patterns...`);
+
+          const response = await fetchSafe('frequency-response?smoothing=1%2F48&ppo=96', i);
+          const nulls = await findNulls(response, i);
+
+          if (nulls.length >= 2) {
+            const sbirInfo = analyzeSBIRPattern(nulls, c);
+
+            if (sbirInfo.isSBIR) {
+              sbirPatterns.push({
+                speaker: title,
+                speakerIndex: i,
+                estimatedBoundaryDistance: sbirInfo.distance,
+                nullFrequencies: sbirInfo.frequencies,
+                severity: sbirInfo.severity
+              });
+
+              console.warn(`${title}: SBIR detected! Boundary at ~${sbirInfo.distance.toFixed(2)}m`);
+              console.warn(`  Nulls at: ${sbirInfo.frequencies.map(f => f.toFixed(0) + 'Hz').join(', ')}`);
+              console.warn(`  Severity: ${sbirInfo.severity.toUpperCase()}`);
+            }
+          }
+        }
+
+        window.detectedSBIR = sbirPatterns;
+        return sbirPatterns;
+      }
+
+      // Find nulls helper
+      async function findNulls(response, measurementIdx, threshold = -6) {
+        const fullResponse = response2array(response, 20, 500);
+        const nulls = [];
+        let freq = 20;
+        const octave = Math.pow(2, 1 / 96);
+
+        const avgLevel = fullResponse.reduce((sum, val) => sum + val, 0) / fullResponse.length;
+
+        for (let i = 1; i < fullResponse.length - 1; i++) {
+          freq *= octave;
+
+          if (fullResponse[i] < fullResponse[i - 1] &&
+            fullResponse[i] < fullResponse[i + 1] &&
+            fullResponse[i] < avgLevel + threshold) {
+
+            const depth = avgLevel - fullResponse[i];
+            const q = (freq / 10); // Simplified Q calculation
+
+            nulls.push({
+              frequency: freq,
+              depth: depth,
+              q: q
+            });
+          }
+        }
+
+        return nulls.sort((a, b) => a.frequency - b.frequency);
+      }
+
+      // Analyze SBIR pattern
+      function analyzeSBIRPattern(nulls, speedOfSound) {
+        if (nulls.length < 2) return { isSBIR: false };
+
+        const firstNull = nulls[0].frequency;
+        const expectedDistance = speedOfSound / (4 * firstNull);
+
+        let matchCount = 0;
+        const detectedFrequencies = [firstNull];
+
+        for (let n = 2; n <= 4; n++) {
+          const expectedFreq = firstNull * (2 * n - 1);
+          const tolerance = expectedFreq * 0.15;
+
+          const foundNull = nulls.find(nullPoint =>
+            Math.abs(nullPoint.frequency - expectedFreq) < tolerance
+          );
+
+          if (foundNull) {
+            matchCount++;
+            detectedFrequencies.push(foundNull.frequency);
+          }
+        }
+
+        const isSBIR = matchCount >= 1;
+
+        let severity = 'low';
+        if (nulls[0].depth > 10 && nulls[0].q > 3) {
+          severity = 'severe';
+        } else if (nulls[0].depth > 6) {
+          severity = 'moderate';
+        }
+
+        return {
+          isSBIR: isSBIR,
+          distance: expectedDistance,
+          frequencies: detectedFrequencies,
+          severity: severity
+        };
+      }
+
+      // Display SBIR results
+      function displaySBIRResults() {
+        if (!window.detectedSBIR || window.detectedSBIR.length === 0) return;
+
+        console.log("\n🔊 SBIR (BOUNDARY INTERFERENCE) ANALYSIS:");
+        console.log("═".repeat(50));
+
+        for (const sbir of window.detectedSBIR) {
+          // console.warn(`\n${sbir.speaker}:`);
+          console.warn(`${sbir.speaker}:`);
+          console.log(`├─ Estimated boundary distance: ${sbir.estimatedBoundaryDistance.toFixed(2)}m`);
+          console.log(`├─ Severity: ${sbir.severity.toUpperCase()}`);
+          console.log(`├─ Null frequencies: ${sbir.nullFrequencies.map(f => f.toFixed(0) + 'Hz').join(', ')}`);
+
+          if (sbir.estimatedBoundaryDistance < 0.6) {
+            console.log(`└─ ⚠️ RECOMMENDATION: Move speaker at least ${(0.6 - sbir.estimatedBoundaryDistance).toFixed(1)}m away from wall`);
+            console.log(`--`);
+          } else if (sbir.severity === 'severe') {
+            console.log(`   ❌ Severe SBIR detected - EQ cannot fix this, repositioning required!`);
+            console.log(`--`);
+          } else {
+            console.log(`--`);
+          }
+        }
+      }
+
+      async function checkAndDisableSBIRFilters(speakerIdx, filters) {
+        if (!window.detectedSBIR) return;
+
+        const speakerSBIR = window.detectedSBIR.find(s => s.speakerIndex === speakerIdx);
+        if (!speakerSBIR) return;
+
+        let modified = false;
+
+        // Only check active filters
+        filters.forEach(filter => {
+          // Skip inactive filter slots
+          if (filter.type === "None") return;
+
+          for (const nullFreq of speakerSBIR.nullFrequencies) {
+            const ratio = filter.frequency / nullFreq;
+
+            // If filter is within 10% of SBIR null frequency
+            if (ratio > 0.9 && ratio < 1.1) {
+              if (speakerSBIR.severity === 'severe' && filter.gaindB > 0) {
+                filter.enabled = false;
+                console.warn(`    SBIR: Disabled boost at ${filter.frequency.toFixed(0)}Hz (severe null at ${nullFreq.toFixed(0)}Hz)`);
+                modified = true;
+              } else if (speakerSBIR.severity === 'moderate' && filter.gaindB > 2) {
+                filter.gaindB = 2;
+                console.warn(`    SBIR: Limited boost at ${filter.frequency.toFixed(0)}Hz to 2dB (moderate null at ${nullFreq.toFixed(0)}Hz)`);
+                modified = true;
+              }
+            }
+          }
+        });
+
+        if (modified) {
+          await postSafe(`${baseUrl}/${speakerIdx}/filters`, { filters }, "Filters set");
+        }
+      }
+      /* ============== */
+      /* SBIR DETECTION */
       // ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
       // PROPRIETARY FILTER GENERATION AND CHECKING ! 
       // CAN NOT BE USED WITHOUT EXPLICIT PERMISSION OF NVEXX !
@@ -2675,15 +3077,13 @@
 
       // CURVE!!
       async function getLow3dBPoint(idx, start = 10, end = 320) {
-        // const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
         let response;
         if (isRP22mode == true) {
           response = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
           console.info("getLow3dBPoint: applying CEDIA RP22 - 1/3 smoothing");
         } else {
-          response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
-          // response = await fetchSafe('frequency-response?smoothing=1/2&ppo=96', idx);
-          console.info("getLow3dBPoint: applying Default - Psy smoothing");
+          response = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
+          console.info("getLow3dBPoint: applying Default - 1/1 smoothing");
         }
         const rpArray = response2array(response, start, end);
         const tcArray = response2array(targetResponse, start, end);
@@ -2700,7 +3100,6 @@
         if (isDebugMode) {
           // ADD THIS ABSOLUTE LEVEL CHECK HERE ↓
           console.log("=== ABSOLUTE LEVEL CHECK ===");
-
           // Find speaker's actual peak level in measurement range
           let maxLevel = -Infinity;
           let maxLevelFreq = start;
@@ -2742,15 +3141,13 @@
 
       // CURVE!!
       async function getHigh3dBPoint(idx, start = 10, end = 320) {
-        // const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
         let response;
         if (isRP22mode == true) {
           response = await fetchSafe('frequency-response?smoothing=1/3&ppo=96', idx);
           console.info("getHigh3dBPoint: applying CEDIA RP22 - 1/3 smoothing");
         } else {
-          response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
-          // response = await fetchSafe('frequency-response?smoothing=1/2&ppo=96', idx);
-          console.info("getHigh3dBPoint: applying Default - Psy smoothing");
+          response = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
+          console.info("getHigh3dBPoint: applying Default - 1/1 smoothing");
         }
         const rpArray = response2array(response, start, end);
         const tcArray = response2array(targetResponse, start, end);
@@ -2766,7 +3163,6 @@
         if (isDebugMode) {
           // ADD THIS ABSOLUTE LEVEL CHECK HERE ↓
           console.log("=== ABSOLUTE LEVEL CHECK ===");
-
           // Find speaker's actual peak level in measurement range
           let maxLevel = -Infinity;
           let maxLevelFreq = start;
@@ -2809,14 +3205,10 @@
 
       // let modeSubXOMin = 31.5; let modeSubXOMax = 120;
       async function getAbsLow3dBPointForSub(idx, start = 10, end = 300) {
-        // finds low -3dB point from mean SPL between 30-80hz
-        const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
-        // const response = await fetchSafe('frequency-response?smoothing=1/2&ppo=96', idx);
-        // const subArray = response2array(response, 30, 80);
-        // const subArray = response2array(response, 15, 200);
+        const response = await fetchSafe('frequency-response?smoothing=1/48&ppo=96', idx);
+        const rpArray = response2array(response, start, end);
         const subArray = response2array(response, modeSubXOMin - 10, modeSubXOMax + 10);
         const subSPL = subArray.reduce((acc, val) => acc + val, 0) / subArray.length;
-        const rpArray = response2array(response, start, end);
         const octave = Math.pow(2, 1 / 96);
         let rolloff = start;
         for (let i = 0; i < rpArray.length; i++) {
@@ -2828,14 +3220,10 @@
 
       // let modeSubXOMin = 31.5; let modeSubXOMax = 120;
       async function getAbsHigh3dBPointForSub(idx, start = 10, end = 300) {
-        // finds high -3dB point from mean SPL between 30-80hz
-        const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
-        // const response = await fetchSafe('frequency-response?smoothing=1/2&ppo=96', idx);
-        // const subArray = response2array(response, 30, 80);
-        // const subArray = response2array(response, 15, 200);
+        const response = await fetchSafe('frequency-response?smoothing=1/48&ppo=96', idx);
+        const rpArray = response2array(response, start, end);
         const subArray = response2array(response, modeSubXOMin - 10, modeSubXOMax + 10);
         const subSPL = subArray.reduce((acc, val) => acc + val, 0) / subArray.length;
-        const rpArray = response2array(response, start, end);
         const octave = Math.pow(2, 1 / 96);
         let rolloff = end;
         for (let i = rpArray.length - 1; i >= 0; i--) {
@@ -2846,20 +3234,14 @@
       }
 
       // let modeSpkMin = 20; let modeSpkMax = 20000;
-      // async function getAbsLow3dBPointForSpk(idx, start = 20, end = 20000) {
       async function getAbsLow3dBPointForSpk(idx, start = modeSpkMin, end = modeSpkMax) {
-        // finds low -3dB point from mean SPL in speaker's optimal midrange
-        const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
-        // const response = await fetchSafe('frequency-response?smoothing=1/2&ppo=96', idx);
-
-        // Use midrange reference band for speakers (not bass range like subs)
+        // finds high -3dB point from mean SPL in speaker's optimal midrange >> Use midrange reference band for speakers (not bass range like subs)  
+        const response = await fetchSafe('frequency-response?smoothing=1/48&ppo=96', idx);
+        const rpArray = response2array(response, start, end);
         const refArray = response2array(response, 500, 2000);  // Speaker midrange reference
         const refSPL = refArray.reduce((acc, val) => acc + val, 0) / refArray.length;
-
-        const rpArray = response2array(response, start, end);
         const octave = Math.pow(2, 1 / 96);
         let rolloff = start;
-
         for (let i = 0; i < rpArray.length; i++) {
           if ((rpArray[i] - refSPL) >= -3) { break; }
           rolloff *= octave;
@@ -2868,20 +3250,14 @@
       }
 
       // let modeSpkMin = 20; let modeSpkMax = 20000;
-      // async function getAbsHigh3dBPointForSpk(idx, start = 20, end = 20000) {
       async function getAbsHigh3dBPointForSpk(idx, start = modeSpkMin, end = modeSpkMax) {
-        // finds high -3dB point from mean SPL in speaker's optimal midrange  
-        const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
-        // const response = await fetchSafe('frequency-response?smoothing=1/2&ppo=96', idx);
-
-        // Use midrange reference band for speakers
+        // finds high -3dB point from mean SPL in speaker's optimal midrange >> Use midrange reference band for speakers (not bass range like subs)  
+        const response = await fetchSafe('frequency-response?smoothing=1/48&ppo=96', idx);
+        const rpArray = response2array(response, start, end);
         const refArray = response2array(response, 500, 2000);  // Speaker midrange reference
         const refSPL = refArray.reduce((acc, val) => acc + val, 0) / refArray.length;
-
-        const rpArray = response2array(response, start, end);
         const octave = Math.pow(2, 1 / 96);
         let rolloff = end;
-
         for (let i = rpArray.length - 1; i >= 0; i--) {
           if ((rpArray[i] - refSPL) >= -3) { break; }
           rolloff /= octave;
@@ -2889,7 +3265,7 @@
         return Math.max(rolloff, start);
       }
 
-      // async function getSpeakerHFRolloff(idx, start = 10000, end = 20000) {
+      // get high frequency rolloff
       async function getSpeakerHFRolloff(idx, start = 10000, end = 20000) {
         // goal of this function is to find the roll-off past 10k before any HF peaks that can mess with the high shelf
         const response = await fetchSafe('frequency-response?smoothing=Psy&ppo=96', idx);
@@ -2946,28 +3322,7 @@
             idx = Object.keys(pairAvg.results)[0];
           }
           const rolloff = await getLow3dBPoint(idx);
-          const rolloffHF = await getSpeakerHFRolloff(i); // speaker specific, not pair specific
-
-          if (isRP22mode == true) {
-            m3dBPoints[i] = [Math.round(rolloff), 15000];
-            console.info("calculateRolloffs: applying CEDIA RP22 - 15000 rolloff");
-          } else if (isDolbymode == true) {
-            m3dBPoints[i] = [Math.round(rolloff), 16000];
-            console.info("calculateRolloffs: applying DOLBY - 16000 rolloff");
-          } else if (isTHXmode == true) {
-            m3dBPoints[i] = [Math.round(rolloff), 20000];
-            console.info("calculateRolloffs: applying THX - 20000 rolloff");
-          } else if (isIMAXmode == true) {
-            m3dBPoints[i] = [Math.round(rolloff), 20000];
-            console.info("calculateRolloffs: applying IMAX - 20000 rolloff");
-          } else {
-            // m3dBPoints[i] = [Math.round(rolloff), 12500]; // audy mic generally garbage past 10k and messes with high shelf
-            m3dBPoints[i] = [Math.round(rolloff), Math.round(rolloffHF)];
-            // console.info("calculateRolloffs: applying Default - 12500 rolloff");
-            // console.info("calculateRolloffs: applying Default - calculated rolloff");
-            console.info(`calculateRolloffs: applying Default - ${Math.round(rolloffHF)} rolloff`);
-          }
-
+          // const rolloffHF = await getSpeakerHFRolloff(i); // speaker specific, not pair specific
           let initialXO = findNearestXO(rolloff);
           // edge case for no subwoofer
           if (noSub && cmdIds.endsWith("FL & FR")) {
@@ -2975,30 +3330,61 @@
           }
 
           customCrossover[i] = initialXO;
+          // used for EQ limits
+          if (isRP22mode == true) {
+            const rolloffLF = await getLow3dBPoint(i);
+            const rolloffHF = await getSpeakerHFRolloff(i); // speaker specific, not pair specific
+            m3dBPoints[i] = [Math.round(rolloffLF), 15000];
+            console.info("calculateRolloffs: applying CEDIA RP22 - 15000 rolloff");
+          } else if (isDolbymode == true) {
+            const rolloffLF = await getLow3dBPoint(i);
+            const rolloffHF = await getSpeakerHFRolloff(i); // speaker specific, not pair specific
+            m3dBPoints[i] = [Math.round(rolloffLF), 16000];
+            console.info("calculateRolloffs: applying DOLBY - 16000 rolloff");
+          } else if (isTHXmode == true) {
+            const rolloffLF = await getLow3dBPoint(i);
+            const rolloffHF = await getSpeakerHFRolloff(i); // speaker specific, not pair specific
+            m3dBPoints[i] = [Math.round(rolloffLF), 20000];
+            console.info("calculateRolloffs: applying THX - 20000 rolloff");
+          } else if (isIMAXmode == true) {
+            const rolloffLF = await getLow3dBPoint(i);
+            const rolloffHF = await getSpeakerHFRolloff(i); // speaker specific, not pair specific
+            m3dBPoints[i] = [Math.round(rolloffLF), 20000];
+            console.info("calculateRolloffs: applying IMAX - 20000 rolloff");
+          } else {
+            const rolloffLF = await getLow3dBPoint(i);
+            const rolloffHF = await getSpeakerHFRolloff(i); // speaker specific, not pair specific
+            m3dBPoints[i] = [Math.round(rolloffLF), Math.round(rolloffHF)];
+            console.info(`calculateRolloffs: applying Default - ${Math.round(rolloffHF)} rolloff`);
+          }
+
+
           if (!singleChannel) {
+            customCrossover[i + 1] = initialXO;
+            // i++;
+            await postDelete(idx); // cleanup
+            const rolloffLF = await getLow3dBPoint(i + 1); // speaker specific, not pair specific
             const rolloffHFR = await getSpeakerHFRolloff(i + 1); // speaker specific, not pair specific
             if (isRP22mode == true) {
-              m3dBPoints[i + 1] = [Math.round(rolloff), 15000];
+              m3dBPoints[i + 1] = [Math.round(rolloffLF), 15000];
               console.info("calculateRolloffs: applying CEDIA RP22 - 15000 rolloff");
             } else if (isDolbymode == true) {
-              m3dBPoints[i + 1] = [Math.round(rolloff), 16000];
+              m3dBPoints[i + 1] = [Math.round(rolloffLF), 16000];
               console.info("calculateRolloffs: applying DOLBY - 16000 rolloff");
             } else if (isTHXmode == true) {
-              m3dBPoints[i + 1] = [Math.round(rolloff), 20000];
+              m3dBPoints[i + 1] = [Math.round(rolloffLF), 20000];
               console.info("calculateRolloffs: applying THX - 20000 rolloff");
             } else if (isIMAXmode == true) {
-              m3dBPoints[i + 1] = [Math.round(rolloff), 20000];
+              m3dBPoints[i + 1] = [Math.round(rolloffLF), 20000];
               console.info("calculateRolloffs: applying IMAX - 20000 rolloff");
             } else {
               // m3dBPoints[i] = [Math.round(rolloff), 12500]; // audy mic generally garbage past 10k and messes with high shelf
-              m3dBPoints[i + 1] = [Math.round(rolloff), Math.round(rolloffHFR)];
+              m3dBPoints[i + 1] = [Math.round(rolloffLF), Math.round(rolloffHFR)];
               // console.info("calculateRolloffs: applying Default - 12500 rolloff");
               // console.info("calculateRolloffs: applying Default - calculated rolloff");
               console.info(`calculateRolloffs: applying Default - ${Math.round(rolloffHFR)} rolloff`);
             }
-            customCrossover[i + 1] = initialXO;
             i++;
-            await postDelete(idx); // cleanup
           }
           const logMessage = initialXO === "L" ? "Large/Full Range" : `Initial XO: ${initialXO}hz`;
           console.info(`${cmdIds} - roll-off: ${rolloff.toFixed(2)}Hz → ${logMessage}`);
@@ -3049,6 +3435,7 @@
         RP22submaxXO = subHighFreq.toFixed(2);
 
         sanityCheckInitialXO(); // update initialXOs based on subwoofer bandwidth
+
       }
 
       function sanityCheckInitialXO() {
@@ -3138,11 +3525,13 @@
         if (noSub) { return; }
         const flIndex = getFLIndex();
         let distMinSub = Infinity;
+        let distMaxSub = -Infinity;
         // check if any directional subwoofer needs negative distance
         if (bassMode === "Directional") {
           for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
             const distSub = flDist + (mSec[flIndex] - mSec[i]) * sOs;
             distMinSub = Math.min(distMinSub, distSub);
+            distMaxSub = Math.max(distMaxSub, distSub);
           }
         }
         // check if any SWMIX subwoofer needs negative distance
@@ -3151,13 +3540,24 @@
           const distLoSub = distMainSub - subLoDelay * sOs;
           const distHiSub = distMainSub - subHiDelay * sOs;
           distMinSub = Math.min(distLoSub, distHiSub);
+          distMaxSub = Math.max(distLoSub, distHiSub);
         }
         if (distMinSub < 0) {
-          console.warn(`Distances are being shifted by ${Math.abs(distMinSub).toFixed(2)}m to accommodate the required subwoofer delay!`);
+          const distShift = 0 - distMinSub;
+          console.warn(`Distances are being shifted by ${distShift.toFixed(2)}m to accommodate the required subwoofer delay!`);
           console.info("This adjustment will ONLY improve overall sound quality.");
           console.info("The receiver only accounts for relative time delays between speakers which are being kept intact.");
           for (let i = 1; i <= nSpeakers + nSubs; i++) {
-            customDistance[i] += Math.abs(distMinSub);
+            customDistance[i] += distShift;
+          }
+        }
+        if (distMaxSub > 18) {
+          const distShift = 18 - distMaxSub;
+          console.warn(`Distances are being shifted by ${distShift.toFixed(2)}m to accommodate the required subwoofer delay!`);
+          console.info("This adjustment will ONLY improve overall sound quality.");
+          console.info("The receiver only accounts for relative time delays between speakers which are being kept intact.");
+          for (let i = 1; i <= nSpeakers + nSubs; i++) {
+            customDistance[i] += distShift;
           }
         }
       }
@@ -3252,7 +3652,7 @@
             .map((f, i) => ({ f, phase: phaseArray[i] }))
             .filter(p => p.f >= low && p.f <= high);
 
-          console.info(`Slope estimation for ${crossoverFreq}Hz: using ${points.length} points from ${low}Hz to ${high}Hz`);
+          console.info(`├─ Slope estimation for ${crossoverFreq}Hz: using ${points.length} points from ${low}Hz to ${high}Hz`);
 
           if (points.length < 2) return null;
 
@@ -3270,7 +3670,7 @@
           }
 
           const slope = den === 0 ? null : num / den;
-          console.info(`Calculated slope: ${slope?.toFixed(1)}°/octave`);
+          console.info(`├─ Calculated slope: ${slope?.toFixed(1)}°/octave`);
           return slope;
         }
 
@@ -3292,7 +3692,7 @@
             const xoIndex = closestIndex;
             const xoPhase = actualPhaseArray[xoIndex];
 
-            console.info(`Phase target calc: slope=${slope.toFixed(1)}°/oct, anchor freq=${frequencyArray[xoIndex].toFixed(1)}Hz, anchor phase=${xoPhase.toFixed(1)}°`);
+            console.info(`├─ Phase target calc: slope=${slope.toFixed(1)}°/oct, anchor freq=${frequencyArray[xoIndex].toFixed(1)}Hz, anchor phase=${xoPhase.toFixed(1)}°`);
 
             return frequencyArray.map(freq => {
               const octaves = Math.log2(freq / crossoverFreq);
@@ -3460,7 +3860,7 @@
             // console.info(`${cmdIds} - Initial XO: ${initialXO}hz → Checking XO: ${checkXO}hz (RMS: ${rmsError.toFixed(3)}) [${speakerRange.layer} layer]`);
             // console.info(`${cmdIds} - Initial XO: ${initialXO}hz → Checking XO: ${checkXO}hz [${speakerRange.layer} layer]`);
             console.info(`→`);
-            console.info(`${cmdIds} - Initial XO: ${initialXO}hz → Testing XO: ${checkXO}hz [${speakerRange.layer} layer]`);
+            console.info(`├─ ${cmdIds} - Initial XO: ${initialXO}hz → Testing XO: ${checkXO}hz [${speakerRange.layer} layer]`);
 
             if (singleChannel) {
               await genSpeaker(i, checkXO);
@@ -3500,24 +3900,24 @@
 
               if (phaseArray) {
                 targetPhaseArray = calculateExpectedCrossoverPhase(responseFrequencyArray, checkXO, phaseArray);
-                console.info(`DEBUG: Crossover ${checkXO}Hz phase analysis:`);
+                console.info(`├─ DEBUG: Crossover ${checkXO}Hz phase analysis:`);
 
                 // Add null checks for debugging
                 if (phaseArray && phaseArray.length > 0) {
-                  console.info(`Actual phase at ${checkXO}Hz: ${phaseArray[Math.floor(phaseArray.length / 2)].toFixed(1)}°`);
+                  console.info(`├─ Actual phase at ${checkXO}Hz: ${phaseArray[Math.floor(phaseArray.length / 2)].toFixed(1)}°`);
 
                   if (responseFrequencyArray && responseFrequencyArray.length > 1) {
                     const phaseSlope = (phaseArray[phaseArray.length - 1] - phaseArray[0]) / (responseFrequencyArray[responseFrequencyArray.length - 1] - responseFrequencyArray[0]);
-                    console.info(`Actual phase slope: ${phaseSlope.toFixed(2)}°/Hz`);
+                    console.info(`├─ Actual phase slope: ${phaseSlope.toFixed(2)}°/Hz`);
                   }
                 }
 
                 if (targetPhaseArray && targetPhaseArray.length > 0) {
-                  console.info(`Expected phase at ${checkXO}Hz: ${targetPhaseArray[Math.floor(targetPhaseArray.length / 2)].toFixed(1)}°`);
+                  console.info(`├─ Expected phase at ${checkXO}Hz: ${targetPhaseArray[Math.floor(targetPhaseArray.length / 2)].toFixed(1)}°`);
                 } else {
                   console.warn(`ERROR: targetPhaseArray is null or empty`);
                 }
-                console.info(`Phase optimization enabled for ${checkXO}Hz crossover (unwrapped)`);
+                console.info(`├─ Phase optimization enabled for ${checkXO}Hz crossover`);
               }
             }
 
@@ -3535,7 +3935,7 @@
             );
 
             // ADD THIS LINE HERE:
-            console.info(`${cmdIds} - XO: ${checkXO}hz → Result: RMS: ${rmsError.toFixed(3)}`);
+            console.log(`└─ ${cmdIds} - XO: ${checkXO}hz → Result: RMS: ${rmsError.toFixed(3)}`);
             // console.info(`←`);
 
             if (rmsError < minRmsError) {
@@ -3591,55 +3991,209 @@
       }
 
       async function directional2standard() {
-        let currSubIdx = nSpeakers + 1;
-        let cmdIds = commandId[currSubIdx];
-        let minDelay = 0, maxDelay = 0;
-        // let startFreq = Math.round(await getLow3dBPoint(currSubIdx));
-        // let endFreq = Math.round(await getHigh3dBPoint(currSubIdx));
+        let measurements = await fetch_mREW();
+        let mCount = Object.keys(measurements).length;
+
+        // Isolate SW commandIds & peak IR times (from your working version)
+        const swCmdIdsWithIRPeak = {};
+        for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+          if (commandId[i] && commandId[i].startsWith("SW")) {
+            // Find the measurement index for this subwoofer
+            let measurementIdx = i;
+            // Adjust for measurement indexing if needed
+            for (let j = 1; j <= mCount; j++) {
+              if (measurements[j].title.startsWith(commandId[i])) {
+                measurementIdx = j;
+                break;
+              }
+            }
+            if (measurements[measurementIdx]) {
+              swCmdIdsWithIRPeak[commandId[i]] = measurements[measurementIdx].timeOfIRPeakSeconds;
+            }
+          }
+        }
+        //// debugger;
+
+        // Sort subs using peak IR time based on closest to farthest
+        const sortedSwList = Object.entries(swCmdIdsWithIRPeak).sort((a, b) => a[1] - b[1]).map(row => row[0]);
+        console.info(`Alignment order based on IR peak time: ${sortedSwList}`);
+        //// debugger;
+
+        // Build sorted indices arrays - find existing measurements like SW10, SW11, etc.
+        const swIndices = [];
+        for (let i = 0; i < sortedSwList.length; i++) {
+          const swName = sortedSwList[i]; // e.g., "SW1", "SW2", "SW3"
+          const subNumber = swName.slice(-1); // Extract "1", "2", "3"
+
+          // Find all measurements for this subwoofer (SW10, SW11, SW12, etc.)
+          const subMeasurements = [];
+          for (let j = 1; j <= mCount; j++) {
+            if (measurements[j] && measurements[j].title.startsWith(`SW${subNumber}`)) {
+              subMeasurements.push(j);
+            }
+          }
+          //// debugger;
+
+          if (subMeasurements.length > 0) {
+            // Sort by position number (SW10, SW11, SW12...)
+            subMeasurements.sort((a, b) => {
+              const posA = parseInt(measurements[a].title.slice(2));
+              const posB = parseInt(measurements[b].title.slice(2));
+              return posA - posB;
+            });
+            swIndices.push(subMeasurements);
+          }
+          //// debugger;
+        }
+        //// debugger;
+
+        let currSubIdx = swIndices[0][0];
+        // let cmdIds = commandId[currSubIdx];
+        let cmdIds = measurements[currSubIdx].title.slice(0, -1);
+        // let minDelay = 0, maxDelay = 0;
         let startFreq = Math.round(await getAbsLow3dBPointForSub(currSubIdx));
         let endFreq = Math.round(await getAbsHigh3dBPointForSub(currSubIdx));
-        for (let i = nSpeakers + 2; i <= nSpeakers + nSubs; i++) {
-          console.log(`Aligning ${commandId[i]} to ${cmdIds}...`);
-          // startFreq = Math.min(startFreq, Math.round(await getLow3dBPoint(i)));
-          // endFreq = Math.max(endFreq, Math.round(await getHigh3dBPoint(i)));
-          startFreq = Math.min(startFreq, Math.round(await getAbsLow3dBPointForSub(i)));
-          endFreq = Math.max(endFreq, Math.round(await getAbsHigh3dBPointForSub(i)));
-          const [isPossible, requiredDelay, isInverted, sumIndex] = await alignMsub(currSubIdx, i, startFreq, endFreq);
+        //// debugger;
+
+        for (let i = 1; i < swIndices.length; i++) {
+          let thisSubIdx = swIndices[i][0];
+          // const thisSubCmdId = commandId[thisSubIdx];
+          const thisSubCmdId = measurements[thisSubIdx].title.slice(0, -1);
+          const thisSubNumber = parseInt(thisSubCmdId.slice(-1));
+          console.log(`Aligning ${thisSubCmdId} to ${cmdIds}...`);
+
+          //// debugger;
+
+          startFreq = Math.min(startFreq, Math.round(await getAbsLow3dBPointForSub(thisSubIdx)));
+          endFreq = Math.max(endFreq, Math.round(await getAbsHigh3dBPointForSub(thisSubIdx)));
+
+          // const [loDelay, hiDelay] = getDelayRangeOf(mSec[thisSubIdx], nSpeakers + 1, nSpeakers + nSubs);
+          // const [isPossible, requiredDelay, isInverted, sumIndex] = await alignMsub(currSubIdx, thisSubIdx, startFreq, endFreq, loDelay, hiDelay);
+          const [loDelay, hiDelay] = getDelayRangeOf(mSec[nSpeakers + thisSubNumber], nSpeakers + 1, nSpeakers + nSubs);
+          const [isPossible, requiredDelay, isInverted, sumIndex] = await alignMsub(currSubIdx, thisSubIdx, startFreq, endFreq, loDelay, hiDelay);
+
           if (!isPossible || !sumIndex) {
             console.error("Failed to align multiple subwoofers!");
-            throw new Error;
+            throw new Error("Subwoofer alignment failed");
           }
+          //// debugger;
+
           currSubIdx = sumIndex;
-          // mSec[i] += (requiredDelay / 1000);
-          mSec[i] += (requiredDelay / delaymax);
-          invertSub[i] = isInverted;
-          cmdIds += ` & ${commandId[i]}`;
-          minDelay = Math.min(minDelay, mSec[i]);
-          maxDelay = Math.max(maxDelay, mSec[i]);
+          // Convert delay from milliseconds to seconds (FIXED)
+          // mSec[thisSubIdx] += (requiredDelay / 1000);
+          mSec[nSpeakers + thisSubNumber] += (requiredDelay / delaymax);
+          // invertSub[thisSubIdx] = isInverted;
+          invertSub[nSpeakers + thisSubNumber] = isInverted;
+          cmdIds += ` & ${thisSubCmdId}`;
+
+          // Track delay range for normalization
+          // minDelay = Math.min(minDelay, mSec[thisSubIdx]);
+          // maxDelay = Math.max(maxDelay, mSec[thisSubIdx]);
+
+          // Apply delay and inversion directly to measurements
+          for (let j = 0; j < swIndices[i].length; j++) {
+            await postNext('Offset t=0', swIndices[i][j], { offset: -mSec[nSpeakers + thisSubNumber], unit: "seconds" });
+            if (isInverted) {
+              await postSafe(`${baseUrl}/${swIndices[i][j]}/command`, { command: "Invert" }, "Invert completed");
+            }
+          }
+          //// debugger;
         }
-        for (let i = currSubIdx - 1; i > nSpeakers; i--) {
+        //// debugger;
+
+        // Cleanup intermediate alignment measurements
+        for (let i = currSubIdx - 1; i > mCount; i--) {
           await postDelete(i);
         }
-        await fetch_mREW(nChannels, 'PUT', { title: "SW1o" });
-        // normalize directional bass subwoofer median IR to t=0
-        const IROffset = (minDelay + maxDelay) / 2;
-        await postNext('Offset t=0', nChannels, { offset: IROffset, unit: "seconds" });
-        for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
-          mSec[i] -= IROffset;
+        //// debugger;
+
+        // Normalize median subwoofer delay to t=0
+        const loSWDelay = Math.min(...mSec.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
+        const hiSWDelay = Math.max(...mSec.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
+        const medianSWDelay = (loSWDelay + hiSWDelay) / 2;
+
+        /*
+        for (let i = 0; i < swIndices.length; i++) {
+          for (let j = 0; j < swIndices[i].length; j++) {
+            await postNext('Offset t=0', swIndices[i][j], { offset: medianSWDelay, unit: "seconds" });
+          }
+          //// debugger;
+          // Note: even though subs aren't aligned in order, it's a don't care here since same IR shift applies to all
+          mSec[nSpeakers + i + 1] -= medianSWDelay;
         }
-        // offset volume from combining subwoofers
-        // const volAdjust = parseFloat(await getSubTrim(nChannels));
-        const volAdjust = await getSubTrim(nChannels);
-        if (volAdjust === 0) { return; } // nothing more to do
-        await postNext('Add SPL offset', nChannels, { offset: volAdjust });
-        // newer AVRs that support directional already compensates for combined subwoofer volume and doesn't need adjustment
-        if (sOs === 300) {
+        */
+        for (let i = 0; i < swIndices.length; i++) {
+          for (let j = 0; j < swIndices[i].length; j++) {
+            await postNext('Offset t=0', swIndices[i][j], { offset: medianSWDelay, unit: "seconds" });
+          }
+          // Extract actual subwoofer number from measurement title
+          const firstMeasurementIdx = swIndices[i][0];
+          const measurementTitle = measurements[firstMeasurementIdx].title;
+          const actualSubNumber = parseInt(measurementTitle.slice(2, -1)); // Extract from "SW30" -> "3"
+
+          mSec[nSpeakers + actualSubNumber] -= medianSWDelay;
+        }
+        //// debugger;
+
+        // Combine subs at the individual position level
+        console.info("Generating combined subwoofer response(s)...");
+        let volAdjust = 0;
+        for (let i = 0; i < swIndices[0].length; i++) {
+          console.infoUpdate(`Generating combined subwoofer response for position #${i + 1}`);
+          const iPosSWIdxs = swIndices.map(row => row[i]);
+          const iPosCombinedSW = await postNext('Vector sum', iPosSWIdxs);
+          const iPosCombinedSWIdx = Object.keys(iPosCombinedSW.results)[0];
+          await fetch_mREW(iPosCombinedSWIdx, 'PUT', { title: `SW1${i}` });
+          if (i === 0) {
+            // Offset multi-sub gain using MLP measurement
+            volAdjust = await getSubTrim(iPosCombinedSWIdx);
+          }
+          //// debugger;
+          await postNext('Add SPL offset', iPosCombinedSWIdx, { offset: volAdjust });
+        }
+        console.infoUpdate(`Generated combined subwoofer response(s) for all positions.`);
+        //// debugger;
+
+        // Cleanup individual sub measurements
+        console.info("Cleaning up individual subwoofer response(s)...");
+        const individualSWIndices = swIndices.flat().sort(function (a, b) { return a - b; });
+        for (let i = individualSWIndices.length - 1; i >= 0; i--) {
+          await postDelete(individualSWIndices[i]);
+        }
+        console.infoUpdate("Cleaned up individual subwoofer response(s).");
+        //// debugger;
+
+        // Apply custom level adjustments for newer AVRs
+        if (sOs === 300 && volAdjust != 0) {
           console.log(`Adjusting combined sub level by ${volAdjust}dB to best follow the target curve...`);
           for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
             customLevel[i] += volAdjust;
             console.info(`${commandId[i].padStart(3, ".")} - shifted: ${customLevel[i] - volAdjust}dB → ${customLevel[i]}dB`);
           }
+          //// debugger;
         }
+        //// debugger;
+
+        // cleanup "Aligned sum" leftover ...
+        measurements = await fetch_mREW();
+        const titles = {};
+        let titleIndices = {};
+        mCount = Object.keys(measurements).length;
+        let measurementArray = Object.keys(measurements).map((key) => ({
+          index: parseInt(key),
+          title: measurements[key].title,
+        }));
+
+        for (i = mCount; i >= 1; i--) {
+          const name = measurements[i].title;
+          if (name == "Aligned sum") {
+            console.info("Deleting", name);
+            await postDelete(i);
+            // await new Promise((resolve) => setTimeout(resolve, speedDelay * 2));
+          }
+        }
+        debugger;
+
       }
 
       function response2array(response, start, end, phase = false) {
@@ -3738,7 +4292,7 @@
         const phaseWeight = 5.0; // Adjust contribution
         const combinedError = magnitudeRMS + (normalizedPhaseRMS * phaseWeight);
 
-        console.info(`📊 RMS: Magnitude: ${magnitudeRMS.toFixed(6)}, Phase: ${phaseRMS.toFixed(2)}°, NormPhase: ${normalizedPhaseRMS.toFixed(4)}, Combined: ${combinedError.toFixed(6)}`);
+        console.log(`├─ 📊 RMS: Magnitude: ${magnitudeRMS.toFixed(6)}, Phase: ${phaseRMS.toFixed(2)}°, NormPhase: ${normalizedPhaseRMS.toFixed(4)}, Combined: ${combinedError.toFixed(6)}`);
 
         return combinedError;
       }
@@ -3746,13 +4300,10 @@
       async function getTrim(idx, start, end) {
         const targetArray = response2array(targetResponse, start, end);
         const targetSPL = targetArray.reduce((acc, val) => acc + val, 0) / targetArray.length;
-
         // Intelligently detect device type based on frequency range
         const isSubwoofer = (end <= 150);
         // const isSubwoofer = (end < 250);
-
         let freqResponse;
-
         /*
         // CEDIA RP22 mode 
         if (isRP22mode) {
@@ -3795,10 +4346,10 @@
          */
         if (isSubwoofer) {
           freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
-          console.info(`getTrim: Default subwoofer (${start}-${end}Hz) - 1/2 smoothing`);
+          console.info(`├─ getTrim: Default subwoofer (${start}-${end}Hz) - 1/2 smoothing`);
         } else {
           freqResponse = await fetchSafe('frequency-response?smoothing=1/1&ppo=96', idx);
-          console.info(`getTrim: Default speaker (${start}-${end}Hz) - 1/1 smoothing`);
+          console.info(`├─ getTrim: Default speaker (${start}-${end}Hz) - 1/1 smoothing`);
         }
         // }
 
@@ -3821,7 +4372,7 @@
         return Math.round(offset * 2) / 2; // round to nearest 0.5
       }
 
-      /* Commit f594500 */
+      // Target Cruve trim only with Var smoothing
       async function getTCTrim(idx, start, end) {
         const targetArray = response2array(targetResponse, start, end);
         const targetSPL = targetArray.reduce((acc, val) => acc + val, 0) / targetArray.length;
@@ -3831,20 +4382,17 @@
         const offset = targetSPL - freqSPL;
         return Math.round(offset * 2) / 2; // round to nearest 0.5
       }
-      /* Commit f594500 */
 
+      // Currently hard set to 30-80 for trim
       async function getSpeakerTrim(idx) {
-        // const spTrim = await getTrim(idx, 500, 2000);
         let mode = 'default';
         if (isRP22mode) mode = 'RP22';
         else if (isDolbymode) mode = 'DOLBY';
         else if (isTHXmode) mode = 'THX';
         else if (isIMAXmode) mode = 'IMAX';
-
         // Measure actual speaker capabilities once
         let actualLow = Math.round(await getAbsLow3dBPointForSpk(idx));
         let actualHigh = Math.round(await getAbsHigh3dBPointForSpk(idx));
-
         let param2, param3;
         switch (mode) {
           case 'RP22':
@@ -3885,29 +4433,24 @@
             modeSpkMin = 20;
             modeSpkMax = 20000;
         }
-
         return await getTrim(idx, 500, 2000);
       }
 
+      // Currently hard set to 30-80 for trim
       async function getSubTrim(idx) {
-        // const subTrim = await getTrim(idx, 30, 80);
         let mode = 'default';
         if (isRP22mode) mode = 'RP22';
         else if (isDolbymode) mode = 'DOLBY';
         else if (isTHXmode) mode = 'THX';
         else if (isIMAXmode) mode = 'IMAX';
-
         // Measure actual subwoofer capabilities
         let actualLow = Math.round(await getAbsLow3dBPointForSub(idx));
         let actualHigh = Math.round(await getAbsHigh3dBPointForSub(idx));
-
         let param2, param3;
         let warnings = [];
-
         switch (mode) {
           case 'RP22':
             param2 = Math.max(actualLow, 20);
-            // param3 = Math.min(actualHigh, 120);
             param3 = Math.max(actualHigh, 120);
             // No warnings - RP22 adapts to actual performance
             modeSubXOMin = 20;
@@ -3916,7 +4459,6 @@
 
           case 'DOLBY':
             param2 = Math.max(actualLow, 31.5);
-            // param3 = Math.min(actualHigh, 120);
             param3 = Math.max(actualHigh, 120);
             modeSubXOMin = 31.5;
             modeSubXOMax = 120;
@@ -3927,7 +4469,6 @@
 
           case 'THX':
             param2 = Math.max(actualLow, 20);
-            // param3 = Math.min(actualHigh, 120);
             param3 = Math.max(actualHigh, 120);
             modeSubXOMin = 20;
             modeSubXOMax = 120;
@@ -3938,7 +4479,6 @@
 
           case 'IMAX':
             param2 = Math.max(actualLow, 20);
-            // param3 = Math.min(actualHigh, 70);
             param3 = Math.max(actualHigh, 70);
             modeSubXOMin = 20;
             modeSubXOMax = 70;
@@ -3949,17 +4489,34 @@
 
           default:
             param2 = Math.max(actualLow, 30);
-            // param3 = Math.min(actualHigh, 80);
             param3 = Math.max(actualHigh, 80);
             modeSubXOMin = 30;
             modeSubXOMax = 80;
         }
-
         // Log warnings for system diagnostics
         if (warnings.length > 0) {
           console.warn('Subwoofer compliance warnings:', warnings);
         }
         return await getTrim(idx, 30, 80);
+      }
+
+      // attempt to fix android volume bug where measurements are off by multiples of +/-6dB
+      // OLD MJ already had this?... Is this still a thing?
+      async function fixVolBug(indices) {
+        if (indices.length <= 1) { return; }
+        const measurements = await fetch_mREW();
+        const mlpIdx = indices[0];
+        const mlpVolume = measurements[mlpIdx].title.startsWith("SW") ? await getSubTrim(mlpIdx) : await getSpeakerTrim(mlpIdx);
+        for (let i = 0; i < indices.length; i++) {
+          if (indices[i] === mlpIdx) { continue; }
+          const idxVolume = measurements[indices[i]].title.startsWith("SW") ? await getSubTrim(indices[i]) : await getSpeakerTrim(indices[i]);
+          const delta = idxVolume - mlpVolume;
+          if (Math.abs(delta) > 5) {
+            const correction = Math.round(delta / 6) * 6;
+            console.warn(`${measurements[indices[i]].title} shifted by ${correction}dB due to a known MultEQ volume bug.`);
+            await postNext('Add SPL offset', indices[i], { offset: correction });
+          }
+        }
       }
 
       async function getDynamicBassFill(idx) {
@@ -3985,6 +4542,8 @@
         hiDelay = Math.max(0, Math.min(delaymax, Math.abs(hiDelay)));   // force positive
         console.info(`Available delay range: ${loDelay.toFixed(2)}ms <-> ${hiDelay.toFixed(2)}ms`);
         let isInverted = false, isPossible = false, requiredDelay = NaN, bestFreq = NaN, maxSum = -Infinity;
+        await postNext('Smooth', ind1, { smoothing: "Var" });
+        await postNext('Smooth', ind2, { smoothing: "Var" });
         await postSafe("http://localhost:4735/alignment-tool/index-a", ind1, "selected as measurement A");
         await postSafe("http://localhost:4735/alignment-tool/index-b", ind2, "selected as measurement B");
         await postAlign('Reset all');
@@ -3994,10 +4553,6 @@
         console.info("Starting...")
 
         for (let checkFreq = 20; checkFreq <= 250; checkFreq++) {
-          // const bestDelayStr = isNaN(requiredDelay) ? "N/A" : requiredDelay.toFixed(2);
-          // const bestFreqStr = isNaN(bestFreq) ? "N/A" : bestFreq;
-          // console.infoUpdate(`Checking: @${checkFreq}Hz, Best: ${bestDelayStr}ms @${bestFreqStr}hz Inverted: ${isInverted}`);
-
           const postAlignResult = await postAlign('Align IRs', checkFreq);
           if (postAlignResult.message === 'Delay too large') { continue; }
 
@@ -4005,8 +4560,8 @@
           const delayB = parseFloat(await fetchAlign('delay-b'));
           if (noInversion && invertB) { continue; };
 
-          const tempSum = await fetchAlign('aligned-frequency-response?smoothing=Psy&ppo=96');
-          // const tempSum = await fetchAlign('aligned-frequency-response?smoothing=1/2&ppo=96');
+          // const tempSum = await fetchAlign('aligned-frequency-response?smoothing=Psy&ppo=96');
+          const tempSum = await fetchAlign('aligned-frequency-response?smoothing=1/6&ppo=96');
           const tempSumArray = response2array(tempSum, start, end);
           const tempMagSum = tempSumArray.reduce((acc, val) => acc + val, 0);
           if (maxSum < tempMagSum) {
@@ -4020,7 +4575,6 @@
           const bestDelayStr = isNaN(requiredDelay) ? "N/A" : requiredDelay.toFixed(2);
           const bestFreqStr = isNaN(bestFreq) ? "N/A" : bestFreq;
           console.infoUpdate(`Checking: @${checkFreq}Hz, Best: ${bestDelayStr}ms @${bestFreqStr}hz Inverted: ${isInverted}`);
-
         }
 
         if (isPossible) {
@@ -4039,20 +4593,24 @@
         return [isPossible, requiredDelay, isInverted];
       }
 
-      async function alignMsub(ind1, ind2, start, end) {
-        const [loDelay, hiDelay] = getDelayRangeOf(mSec[ind2], nSpeakers + 1, nSpeakers + nSubs);
+      async function alignMsub(ind1, ind2, start, end, loDelay, hiDelay) {
         console.info(`Available delay range: ${loDelay.toFixed(2)}ms <-> ${hiDelay.toFixed(2)}ms`);
         let isInverted = false, isPossible = false, requiredDelay = NaN, bestFreq = NaN, maxSum = -Infinity, sumIndex = null;
+        await postNext('Smooth', ind1, { smoothing: "Var" });
+        await postNext('Smooth', ind2, { smoothing: "Var" });
         await postSafe("http://localhost:4735/alignment-tool/index-a", ind1, "selected as measurement A");
         await postSafe("http://localhost:4735/alignment-tool/index-b", ind2, "selected as measurement B");
         await postAlign('Reset all');
         await postSafe("http://localhost:4735/alignment-tool/mode", "Impulse", "Mode set");
         await postSafe("http://localhost:4735/alignment-tool/max-negative-delay", loDelay, "Maximum negative delay set to");
         await postSafe("http://localhost:4735/alignment-tool/max-positive-delay", hiDelay, "Maximum positive delay set to");
-        console.info("Starting...")
+
+        console.info("Starting alignment optimization...");
 
         for (let checkFreq = 20; checkFreq <= 250; checkFreq++) {
           const postAlignResult = await postAlign('Align IRs', checkFreq);
+
+          // Handle delay too large errors (improved from newer version)
           if (postAlignResult.message === 'Delay too large' && previousDelay != postAlignResult.delay) {
             previousDelay = postAlignResult.delay;
             continue;
@@ -4060,12 +4618,17 @@
 
           const invertB = await fetchAlign('invert-b');
           const delayB = parseFloat(await fetchAlign('delay-b'));
-          if (noInversion && invertB) { continue; };
 
-          const tempSum = await fetchAlign('aligned-frequency-response?smoothing=Psy&ppo=96');
-          // const tempSum = await fetchAlign('aligned-frequency-response?smoothing=1/2&ppo=96');
+          // Skip if inversion is not allowed
+          if (noInversion && invertB) {
+            continue;
+          }
+
+          // Get aligned frequency response with consistent smoothing (from newer version)
+          const tempSum = await fetchAlign('aligned-frequency-response?smoothing=1%2F6&ppo=96');
           const tempSumArray = response2array(tempSum, start, end);
           const tempMagSum = tempSumArray.reduce((acc, val) => acc + val, 0);
+
           if (maxSum < tempMagSum) {
             maxSum = tempMagSum;
             bestFreq = checkFreq;
@@ -4074,31 +4637,39 @@
             isInverted = invertB;
           }
 
+          // Better progress reporting (from newer version approach)
           const bestDelayStr = isNaN(requiredDelay) ? "N/A" : requiredDelay.toFixed(2);
           const bestFreqStr = isNaN(bestFreq) ? "N/A" : bestFreq;
-          console.infoUpdate(`Checking: @${checkFreq}Hz, Best: ${bestDelayStr}ms @${bestFreqStr}hz Inverted: ${isInverted}`);
+          console.infoUpdate(`Checking: @${checkFreq}Hz, Best: ${bestDelayStr}ms @${bestFreqStr}Hz Inverted: ${isInverted}`);
         }
 
         if (isPossible) {
+          // Apply optimal alignment
           const postAlignResult = await postAlign('Align IRs', bestFreq);
           const delayB = await fetchAlign('delay-b');
           requiredDelay = parseFloat(delayB);
           isInverted = await fetchAlign('invert-b');
+
+          // Get updated measurements and create aligned sum
           const measurements = await fetch_mREW();
           const mCount = Object.keys(measurements).length;
           const alignedSum = await postAlign('Aligned sum');
           const parsed = JSON.parse(alignedSum.message);
           const key = Object.keys(parsed.results)[0];
           sumIndex = parseInt(key);
+
           console.infoUpdate(`Optimal alignment: @${bestFreq}Hz, required delay: ${requiredDelay.toFixed(2)}ms, isInverted: ${isInverted}`);
+        } else {
+          console.warn("No suitable alignment found within delay constraints");
         }
+
         return [isPossible, requiredDelay, isInverted, sumIndex];
       }
 
       async function genSub(i, freq) {
-        if (freq === "L") {
-          console.error("Cannot set subwoofer as LARGE!")
-          throw new Error;
+        // if no freq provided, just copy response
+        if (!freq) {
+          return await postSafe(`${baseUrl}/${i}/command`, { command: "Response copy" }, "Completed");
         }
         await postSafe(`${baseUrl}/${i}/filters`, {
           filters: [{
@@ -4115,7 +4686,8 @@
       }
 
       async function genSpeaker(i, freq) {
-        if (freq === "L") {
+        // if no freq provided, just copy response
+        if (!freq) {
           return await postSafe(`${baseUrl}/${i}/command`, { command: "Response copy" }, "Completed");
         }
         await postSafe(`${baseUrl}/${i}/filters`, {
@@ -4933,13 +5505,15 @@
         const standardReference = 75.0; // Industry standard SPL reference
         const targetOffset = targetLevel - standardReference;
 
-        console.log(`Target level: ${targetLevel}dB, Standard reference: ${standardReference}dB`);
-        console.log(`Target level offset: ${targetOffset.toFixed(1)}dB`);
+        console.log(`├─ Target level: ${targetLevel}dB, Standard reference: ${standardReference}dB`);
+        console.log(`├─ Target level offset: ${targetOffset.toFixed(1)}dB`);
 
         if (Math.abs(targetOffset) > 0.5) {
-          console.log(`Converting trims from ${targetLevel}dB target to ${standardReference}dB standard...`);
+          console.log(`└─ Converting trims from ${targetLevel}dB target to ${standardReference}dB standard...`);
+          console.info(`─────────────────────────────────────────────────────────`);
         } else {
-          console.log("Target level matches standard reference - no conversion needed.");
+          console.log("└─ Target level matches standard reference - no conversion needed.");
+          console.info(`─────────────────────────────────────────────────────────`);
         }
 
         // Calculate original trim statistics
@@ -4947,15 +5521,16 @@
         const originalTrims = [...customLevel]; // Store copy of original values
 
         // Log original values
-        console.log("Original trim values (relative to current target):");
+        console.log("🔊 Original trim values (relative to current target):");
         console.log("--- SPEAKERS ---");
         for (let i = 1; i <= nSpeakers; i++) {
-          console.log(`${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
+          console.log(`├─ ${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
         }
         if (!noSub) {
           console.log("--- SUBWOOFERS ---");
           for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
-            console.log(`${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
+            console.log(`└─ ${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
+            console.info(`─────────────────────────────────────────────────────────`);
           }
         }
 
@@ -4977,17 +5552,18 @@
         }
 
         // Log the BEFORE → AFTER comparison
-        console.log("BEFORE → AFTER comparison (normalized to 75dB standard):");
+        console.log("🔊 BEFORE → AFTER comparison (normalized to 75dB standard):");
         console.log("--- SPEAKERS ---");
         for (let i = 1; i <= nSpeakers; i++) {
           const change = customLevel[i] - originalTrims[i];
-          console.log(`${commandId[i]}: ${originalTrims[i].toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB (${change >= 0 ? '+' : ''}${change.toFixed(1)}dB)`);
+          console.log(`├─ ${commandId[i]}: ${originalTrims[i].toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB (${change >= 0 ? '+' : ''}${change.toFixed(1)}dB)`);
         }
         if (!noSub) {
           console.log("--- SUBWOOFERS ---");
           for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
             const change = customLevel[i] - originalTrims[i];
-            console.log(`${commandId[i]}: ${originalTrims[i].toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB (${change >= 0 ? '+' : ''}${change.toFixed(1)}dB)`);
+            console.log(`└─ ${commandId[i]}: ${originalTrims[i].toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB (${change >= 0 ? '+' : ''}${change.toFixed(1)}dB)`);
+            console.info(`─────────────────────────────────────────────────────────`);
           }
         }
 
@@ -5644,7 +6220,7 @@
           // Use timing delay spread as proxy for early reflection strength
           // Larger delay spreads typically indicate more early reflections
           const delaySpread = Math.max(...delays) - Math.min(...delays);
-          const spreadMs = Math.abs(delaySpread) * 1000;
+          const spreadMs = Math.abs(delaySpread) * delaymax;
 
           // Convert timing spread to estimated early reflection level (dB relative to direct sound)
           // Based on empirical relationships between delay spread and reflection strength
@@ -7420,7 +7996,6 @@
 
       // Initialize the console logger
       initializeConsoleLogger();
-
     </script>
 </body>
 
