@@ -16,7 +16,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.11 - 27-09-2025 @ 20:08";
+    const nextversion = "ClariQ Next 0.0.12 - 07-10-2025 @ 17:45";
     // ClearCurve
     let isClearCurve = false;
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
@@ -2004,29 +2004,27 @@
         // STEP 3: Initialize Subwoofers
         if (noSub) { return; }
         if (bassMode === "Directional") {
-          console.warn("Your system will now be converted to 'standard bass' mode for a better sound experience...");
-          await directional2standard();
-          console.warn("Conversion from 'directional bass' mode to 'standard bass' mode completed.");
-          // CRITICAL FIX: After directional2standard(), update measurements and title array
-          measurements = await fetch_mREW();
-          mCount = Object.keys(measurements).length;
-          console.info(`├─ Post-directional2standard measurement count: ${mCount}`);
-          // Rebuild title array to match new measurement structure
-          // After directional2standard(), we should have: speakers + 1 combined subwoofer
-          const newTitle = {};
-          count = 1;
-          // Keep speaker titles unchanged
-          for (let i = 1; i <= nSpeakers; i++) {
-            newTitle[i] = title[i];
+          console.warn("⏸️ Directional bass detected - deferring conversion until after ART optimization...");
+          console.info("This allows ART to optimize each subwoofer independently before combining.");
+          // DON'T convert yet - let ART optimize individual subs first
+          // Conversion will happen in convertDirectionalIfNeeded() after ART runs
+
+          // But still need to do the median alignment that was in directional2standard
+          const loSWDelay = Math.min(...mSec.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
+          const hiSWDelay = Math.max(...mSec.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
+          const medianSWDelay = (loSWDelay + hiSWDelay) / 2;
+
+          // Apply median offset to all subs for initial alignment
+          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+            const firstMeasurement = (i - nSpeakers - 1) * micPositions + (nSpeakers * micPositions) + 1;
+            for (let j = 0; j < micPositions; j++) {
+              await postNext('Offset t=0', firstMeasurement + j, { offset: -medianSWDelay, unit: "seconds" });
+            }
+            mSec[i] -= medianSWDelay;
           }
-          // Add single combined subwoofer title
-          newTitle[nSpeakers + 1] = "SW1o";
-          // Update global state
-          title = newTitle;
-          nSubs = 1; // Now we have only 1 combined subwoofer
-          console.info(`├─ Updated title array for combined subwoofer: [${Object.keys(title).map(k => `${k}:"${title[k]}"`).join(', ')}]`);
-          console.info(`├─ Updated nSubs to: ${nSubs}`);
-        } else {
+          console.info(`Applied median delay offset of ${medianSWDelay.toFixed(6)}s to ${nSubs} subs for preliminary alignment`);
+
+        } else if (subLoDelay != 0 || subHiDelay != 0) {
           // normalize standard bass subwoofer median IR to t=0
           const IROffset = (subLoDelay + subHiDelay) / 2;
           // Find the subwoofer MLP index (equivalent to cmdIdMeasurements[commandId[nChannels]][0])
@@ -2161,6 +2159,9 @@
           }
           await postNext('Add SPL offset', nChannels, { offset: dynamicBassFilldB });
         }
+        // Store directional bass state for ART optimization
+        window.hasDirectionalBass = (bassMode === "Directional" && nSubs > 1);
+        window.preCombinedSubCount = nSubs;
       }
 
       async function calculateMaxDeltaOfResponses(indices, start, end) {
@@ -3202,7 +3203,8 @@
         const avgSpeakerWithHPFIdx = Object.keys(avgSpeakerWithHPF.results)[0];
         const subwooferWithLPF = await genSub(mCount, avgInitialXO);
         const subwooferWithLPFIdx = Object.keys(subwooferWithLPF.results)[0];
-        let [isPossible, requiredDelay, isInverted] = await align4system(avgSpeakerWithHPFIdx, subwooferWithLPFIdx, avgInitialXO);
+        // let [isPossible, requiredDelay, isInverted] = await align4system(avgSpeakerWithHPFIdx, subwooferWithLPFIdx, avgInitialXO);
+        let [isPossible, requiredDelay, isInverted] = await align4system(avgSpeakerWithHPFIdx, subwooferWithLPFIdx);
         // cleanup
         await postDelete(subwooferWithLPFIdx);
         await postDelete(avgSpeakerWithHPFIdx);
@@ -3793,6 +3795,44 @@
             // await new Promise((resolve) => setTimeout(resolve, speedDelay * 2));
           }
         }
+
+        // Update the SW name to SW1o
+        // cleanup "Aligned sum" leftover ...
+        measurements = await fetch_mREW();
+        mCount = Object.keys(measurements).length;
+        for (i = mCount; i >= 1; i--) {
+          const name = measurements[i].title;
+          const newname = "SW1o";
+          if (name == "SW10") {
+            console.info("Updating subwoofer name", name);
+            const requestOptions = {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title: newname }),
+            };
+            fetch(`http://localhost:4735/measurements/${i}`, requestOptions);
+          }
+        }
+
+      }
+
+      // ───────────────────────────────────────────────────────────────────────────
+      // Convert directional bass AFTER ART optimization
+      // ───────────────────────────────────────────────────────────────────────────
+      async function convertDirectionalIfNeeded() {
+        if (!window.hasDirectionalBass || window.preCombinedSubCount <= 1) {
+          console.info("✓ No directional bass conversion needed");
+          return;
+        }
+
+        console.log("\n⚡ CONVERTING DIRECTIONAL BASS TO STANDARD (Post-ART Optimization)");
+        console.log("═".repeat(60));
+        console.warn("Converting optimized directional subs to combined standard bass...");
+
+        await directional2standard();
+
+        console.warn("✓ Directional to standard conversion completed with ART-optimized alignment");
+        console.log("═".repeat(60));
       }
 
       function response2array(response, start, end, phase = false) {
@@ -3994,11 +4034,13 @@
         return dynamicBassFill;
       }
 
-      async function align4system(ind1, ind2, xo) {
-        const start = Math.round(xo / 2), end = Math.round(xo * 2);
-        let [loDelay, hiDelay] = getDelayRangeOfFinalSub();
-        loDelay = Math.max(-delaymax, Math.min(0, -Math.abs(loDelay))); // force negative
-        hiDelay = Math.max(0, Math.min(delaymax, Math.abs(hiDelay)));   // force positive
+      async function align4system(ind1, ind2) {
+        // const start = Math.round(xo / 2), end = Math.round(xo * 2);
+        const start = 20, end = 250;
+        // let [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+        const [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+        // loDelay = Math.max(-delaymax, Math.min(0, -Math.abs(loDelay))); // force negative
+        // hiDelay = Math.max(0, Math.min(delaymax, Math.abs(hiDelay)));   // force positive
         console.info(`Available delay range: ${loDelay.toFixed(2)}ms <-> ${hiDelay.toFixed(2)}ms`);
         let isInverted = false, isPossible = false, requiredDelay = NaN, bestFreq = NaN, maxSum = -Infinity;
         await postNext('Smooth', ind1, { smoothing: "Var" });
@@ -4013,9 +4055,11 @@
         for (let checkFreq = 20; checkFreq <= 250; checkFreq++) {
           const postAlignResult = await postAlign('Align IRs', checkFreq);
           if (postAlignResult.message === 'Delay too large') { continue; }
+
           const invertB = await fetchAlign('invert-b');
           const delayB = parseFloat(await fetchAlign('delay-b'));
           if (noInversion && invertB) { continue; };
+
           // const tempSum = await fetchAlign('aligned-frequency-response?smoothing=Psy&ppo=96');
           const tempSum = await fetchAlign('aligned-frequency-response?smoothing=1/6&ppo=96');
           const tempSumArray = response2array(tempSum, start, end);
@@ -4050,8 +4094,10 @@
       async function alignMsub(ind1, ind2, start, end, loDelay, hiDelay) {
         console.info(`Available delay range: ${loDelay.toFixed(2)}ms <-> ${hiDelay.toFixed(2)}ms`);
         let isInverted = false, isPossible = false, requiredDelay = NaN, bestFreq = NaN, maxSum = -Infinity, sumIndex = null;
-        await postNext('Smooth', ind1, { smoothing: "Var" });
-        await postNext('Smooth', ind2, { smoothing: "Var" });
+        // await postNext('Smooth', ind1, { smoothing: "Var" });
+        // await postNext('Smooth', ind2, { smoothing: "Var" });
+        await postNext('Smooth', ind1, { smoothing: "1/48" });
+        await postNext('Smooth', ind2, { smoothing: "1/48" });
         await postSafe("http://localhost:4735/alignment-tool/index-a", ind1, "selected as measurement A");
         await postSafe("http://localhost:4735/alignment-tool/index-b", ind2, "selected as measurement B");
         await postAlign('Reset all');
@@ -4144,6 +4190,681 @@
           }]
         }, "Filters set");
         return await postNext('Generate predicted measurement', i);
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // NART > ART-INSPIRED MULTI-SPEAKER BASS OPTIMIZATION
+      // Place these functions AFTER your SBIR detection functions
+      // Call them in the order specified below
+      // ═══════════════════════════════════════════════════════════════════════════
+
+      // ───────────────────────────────────────────────────────────────────────────
+      // HELPER: Extract phase data from REW response (moved from finalizeXO scope)
+      // ───────────────────────────────────────────────────────────────────────────
+      function response2arrayPhase(response, start, end) {
+        if (!response.phase) {
+          return null;
+        }
+        const bytes = Uint8Array.from(atob(response.phase), (c) => c.charCodeAt(0));
+        const buffer = bytes.buffer;
+        const data = new DataView(buffer);
+        const phaseArray = [];
+        const maxIndex = Math.floor(data.byteLength / 4) - 1;
+        const startIndex = Math.round((start - 0.3662109375) / 0.3662109375);
+        const endIndex = Math.min(Math.round((end - 0.3662109375) / 0.3662109375), maxIndex);
+        for (let i = startIndex; i <= endIndex; i++) {
+          if (i * 4 + 3 < data.byteLength) {
+            phaseArray.push(data.getFloat32(i * 4));
+          }
+        }
+        // Additional unwrapping in case REW unwrap didn't catch everything
+        for (let i = 1; i < phaseArray.length; i++) {
+          let diff = phaseArray[i] - phaseArray[i - 1];
+          while (diff > 180) {
+            phaseArray[i] -= 360;
+            diff = phaseArray[i] - phaseArray[i - 1];
+          }
+          while (diff < -180) {
+            phaseArray[i] += 360;
+            diff = phaseArray[i] - phaseArray[i - 1];
+          }
+        }
+        return phaseArray;
+      }
+
+      // ───────────────────────────────────────────────────────────────────────────
+      // STEP 1: Enhanced Room Mode Detection (beyond SBIR boundary interference)
+      // ───────────────────────────────────────────────────────────────────────────
+      async function analyzeRoomModesEnhanced() {
+        console.log("\n🎯 ANALYZING ROOM MODES (Standing Waves)...");
+        console.log("═".repeat(60));
+
+        const roomModes = {
+          axial: [],      // Between two parallel surfaces
+          tangential: [], // Between four surfaces  
+          oblique: [],    // Between all six surfaces
+          speakers: {}    // Modal data per speaker
+        };
+
+        // Analyze each speaker's modal response
+        for (let i = 1; i <= nSpeakers; i++) {
+          const speakerId = commandId[i];
+          console.info(`Analyzing ${speakerId} for room modes...`);
+
+          const response = await fetchSafe('frequency-response?smoothing=1%2F48&ppo=96', i);
+          const modes = await detectModalFrequencies(response, i);
+
+          if (modes.length > 0) {
+            roomModes.speakers[speakerId] = {
+              speakerIndex: i,
+              modes: modes,
+              position: customDistance[i]
+            };
+
+            console.log(`├─ ${speakerId}: Found ${modes.length} modal frequencies`);
+            modes.forEach(mode => {
+              console.log(`   ├─ ${mode.frequency.toFixed(1)}Hz: ${mode.type}, ${mode.isPositive ? 'PEAK' : 'DIP'} ${Math.abs(mode.magnitude).toFixed(1)}dB`);
+            });
+          }
+        }
+
+        // Store globally for use by other functions
+        window.detectedRoomModes = roomModes;
+
+        console.log("\n📊 ROOM MODE SUMMARY:");
+        const allModes = Object.values(roomModes.speakers)
+          .flatMap(s => s.modes)
+          .map(m => m.frequency)
+          .filter((f, i, arr) => arr.indexOf(f) === i)
+          .sort((a, b) => a - b);
+
+        console.log(`Total unique modal frequencies detected: ${allModes.length}`);
+        if (allModes.length > 0) {
+          console.log(`Frequency range: ${allModes[0].toFixed(1)}Hz - ${allModes[allModes.length - 1].toFixed(1)}Hz`);
+        }
+
+        return roomModes;
+      }
+
+      // Helper: Detect modal frequencies from response
+      async function detectModalFrequencies(response, measurementIdx, start = 20, end = 150) {
+        const fullResponse = response2array(response, start, end);
+        const modes = [];
+        let freq = start;
+        const octave = Math.pow(2, 1 / 96);
+
+        // Calculate average level for reference
+        const avgLevel = fullResponse.reduce((sum, val) => sum + val, 0) / fullResponse.length;
+
+        // Find peaks (positive modes) and dips (negative modes)
+        for (let i = 2; i < fullResponse.length - 2; i++) {
+          freq *= octave;
+
+          // Look for local maxima (peaks)
+          if (fullResponse[i] > fullResponse[i - 1] &&
+            fullResponse[i] > fullResponse[i + 1] &&
+            fullResponse[i] > fullResponse[i - 2] &&
+            fullResponse[i] > fullResponse[i + 2] &&
+            fullResponse[i] > avgLevel + 3) { // At least 3dB above average
+
+            modes.push({
+              frequency: freq,
+              magnitude: fullResponse[i] - avgLevel,
+              isPositive: true,
+              type: classifyMode(freq),
+              index: i
+            });
+          }
+
+          // Look for local minima (dips)
+          if (fullResponse[i] < fullResponse[i - 1] &&
+            fullResponse[i] < fullResponse[i + 1] &&
+            fullResponse[i] < fullResponse[i - 2] &&
+            fullResponse[i] < fullResponse[i + 2] &&
+            fullResponse[i] < avgLevel - 3) { // At least 3dB below average
+
+            modes.push({
+              frequency: freq,
+              magnitude: fullResponse[i] - avgLevel,
+              isPositive: false,
+              type: classifyMode(freq),
+              index: i
+            });
+          }
+        }
+
+        return modes;
+      }
+
+      // Classify mode type based on frequency
+      function classifyMode(frequency) {
+        if (frequency < 60) return 'axial';
+        if (frequency < 100) return 'tangential';
+        return 'oblique';
+      }
+
+      // ───────────────────────────────────────────────────────────────────────────
+      // STEP 2: Multi-Speaker Bass Optimization (NART > ART-inspired)
+      // ───────────────────────────────────────────────────────────────────────────
+      async function optimizeMultiSpeakerBass() {
+        if (noSub) {
+          console.log("⚠️ No subwoofer detected - skipping multi-speaker bass optimization");
+          return;
+        }
+
+        console.log("\n🔊 MULTI-SPEAKER BASS OPTIMIZATION (NART > ART-INSPIRED)");
+        console.log("═".repeat(60));
+        console.log("Analyzing which speakers can contribute to modal cancellation...");
+
+        const roomModes = window.detectedRoomModes;
+        if (!roomModes || Object.keys(roomModes.speakers).length === 0) {
+          console.warn("No room mode data available - run analyzeRoomModesEnhanced() first");
+          return;
+        }
+
+        // Identify bass-capable speakers (can play below 150Hz)
+        const bassCapableSpeakers = [];
+
+        for (let i = 1; i <= nSpeakers; i++) {
+          const lowPoint = await getAbsLow3dBPointForSpk(i, 20, 150);
+          const highPoint = await getAbsHigh3dBPointForSpk(i, 20, 150);
+
+          if (highPoint >= 100) { // Can reach at least 100Hz
+            bassCapableSpeakers.push({
+              index: i,
+              commandId: commandId[i],
+              lowExtension: lowPoint,
+              highExtension: highPoint
+            });
+            console.log(`├─ ${commandId[i]}: Bass capable (${lowPoint.toFixed(0)}Hz - ${highPoint.toFixed(0)}Hz)`);
+          }
+        }
+
+        if (bassCapableSpeakers.length === 0) {
+          console.warn("No bass-capable speakers found for optimization");
+          return;
+        }
+
+        console.log(`\n✓ Found ${bassCapableSpeakers.length} bass-capable speakers`);
+        console.log("Calculating optimal multi-speaker alignment for modal control...\n");
+
+        // Optimize in frequency bands (ART-style)
+        const optimizationResults = {
+          '20-60Hz': await optimizeBassInBand(bassCapableSpeakers, 20, 60, 'axial'),
+          '60-100Hz': await optimizeBassInBand(bassCapableSpeakers, 60, 100, 'tangential'),
+          '100-150Hz': await optimizeBassInBand(bassCapableSpeakers, 100, 150, 'oblique')
+        };
+
+        // Store results globally
+        window.multiSpeakerBassOptimization = optimizationResults;
+
+        // Display results
+        console.log("\n📊 OPTIMIZATION RESULTS:");
+        console.log("─".repeat(60));
+        for (const [band, result] of Object.entries(optimizationResults)) {
+          console.log(`\n${band}:`);
+          console.log(`├─ Improvement: ${result.improvement.toFixed(1)}dB reduction in modal peaks`);
+          console.log(`├─ Speakers contributing: ${result.contributingSpeakers.join(', ')}`);
+          if (result.recommendedDelays && Object.keys(result.recommendedDelays).length > 0) {
+            console.log(`├─ Recommended delay adjustments:`);
+            for (const [spkr, delay] of Object.entries(result.recommendedDelays)) {
+              console.log(`   ├─ ${spkr}: ${delay.toFixed(2)}ms`);
+            }
+          }
+        }
+
+        return optimizationResults;
+      }
+
+      // Optimize bass response in a specific frequency band
+      async function optimizeBassInBand(bassCapableSpeakers, startFreq, endFreq, modeType) {
+        console.log(`Optimizing ${startFreq}-${endFreq}Hz (${modeType} modes)...`);
+
+        const measurements = await fetch_mREW();
+        const contributingSpeakers = [];
+        const recommendedDelays = {};
+
+        // Get subwoofer response as baseline
+        const subResponse = await fetchSafe('frequency-response?smoothing=1%2F12&ppo=96', nChannels);
+        const subArray = response2array(subResponse, startFreq, endFreq);
+        const subModalPeaks = calculateModalPeaks(subArray);
+
+        console.log(`├─ Subwoofer modal peaks in band: ${subModalPeaks.toFixed(1)}dB`);
+
+        // Test each bass-capable speaker's contribution
+        let bestImprovement = 0;
+
+        for (const speaker of bassCapableSpeakers) {
+          // Skip if speaker can't reach this band
+          if (speaker.highExtension < startFreq || speaker.lowExtension > endFreq) {
+            continue;
+          }
+
+          const spkResponse = await fetchSafe('frequency-response?smoothing=1%2F12&ppo=96', speaker.index);
+          const spkArray = response2array(spkResponse, startFreq, endFreq);
+
+          // Test phase alignments: 0°, 90°, 180°, 270°
+          const phaseTests = [
+            { phase: 0, delay: 0, invert: false },
+            { phase: 90, delay: 0.25 * (1000 / ((startFreq + endFreq) / 2)), invert: false },
+            { phase: 180, delay: 0, invert: true },
+            { phase: 270, delay: 0.75 * (1000 / ((startFreq + endFreq) / 2)), invert: false }
+          ];
+
+          for (const test of phaseTests) {
+            // Simulate combined response
+            const combinedArray = subArray.map((val, idx) => {
+              let spkContribution = spkArray[idx];
+              if (test.invert) spkContribution *= -1;
+              return val + spkContribution;
+            });
+
+            const combinedModalPeaks = calculateModalPeaks(combinedArray);
+            const improvement = subModalPeaks - combinedModalPeaks;
+
+            if (improvement > bestImprovement) {
+              bestImprovement = improvement;
+              recommendedDelays[speaker.commandId] = test.delay;
+
+              if (!contributingSpeakers.includes(speaker.commandId)) {
+                contributingSpeakers.push(speaker.commandId);
+              }
+            }
+          }
+        }
+
+        console.log(`├─ Best improvement: ${bestImprovement.toFixed(1)}dB with ${contributingSpeakers.length} speakers`);
+
+        return {
+          band: `${startFreq}-${endFreq}Hz`,
+          modeType: modeType,
+          improvement: bestImprovement,
+          contributingSpeakers: contributingSpeakers,
+          recommendedDelays: recommendedDelays,
+          baselineModalPeaks: subModalPeaks
+        };
+      }
+
+      // Calculate sum of modal peaks (how "peaky" the response is)
+      function calculateModalPeaks(responseArray) {
+        const avgLevel = responseArray.reduce((sum, val) => sum + val, 0) / responseArray.length;
+        let peakSum = 0;
+
+        for (let i = 0; i < responseArray.length; i++) {
+          const deviation = responseArray[i] - avgLevel;
+          if (deviation > 0) { // Only count peaks
+            peakSum += deviation;
+          }
+        }
+
+        return peakSum / responseArray.length;
+      }
+
+      // ───────────────────────────────────────────────────────────────────────────
+      // STEP 3: Frequency-Dependent Alignment (replaces/enhances optimizeSubDelay)
+      // ───────────────────────────────────────────────────────────────────────────
+      async function frequencyDependentAlignment() {
+        if (noSub) {
+          console.log("⚠️ No subwoofer - skipping frequency-dependent alignment");
+          return;
+        }
+
+        console.log("\n🎛️ FREQUENCY-DEPENDENT ALIGNMENT (ART-Style)");
+        console.log("═".repeat(60));
+        console.log("Using different alignment strategies per frequency band...");
+
+        const measurements = await fetch_mREW();
+        const mCount = Object.keys(measurements).length;
+
+        // Define frequency bands with different alignment strategies
+        const bands = [
+          {
+            name: "Deep Bass (20-40Hz)",
+            start: 20,
+            end: 40,
+            strategy: "maximize_output",
+            description: "Maximize total output (ignore phase)"
+          },
+          {
+            name: "Low Bass (40-80Hz)",
+            start: 40,
+            end: 80,
+            strategy: "phase_coherent",
+            description: "Phase-coherent alignment (smoothness)"
+          },
+          {
+            name: "Upper Bass (80-150Hz)",
+            start: 80,
+            end: 150,
+            strategy: "precise_timing",
+            description: "Precise timing alignment (localization)"
+          }
+        ];
+
+        const alignmentResults = [];
+
+        for (const band of bands) {
+          console.log(`\n📍 ${band.name}:`);
+          console.log(`├─ Strategy: ${band.strategy}`);
+          console.log(`├─ Goal: ${band.description}`);
+
+          // ✅ FIX: Use raw averaged measurements (Co, FLo, etc.) instead of equalized
+          let speakerIndices = [];
+          for (let i = 1; i <= nSpeakers; i++) {
+            speakerIndices.push(i);
+          }
+
+          if (speakerIndices.length === 0) {
+            console.warn("No speaker measurements found - skipping band");
+            continue;
+          }
+
+          console.info(`├─ Using ${speakerIndices.length} speaker measurements`);
+
+          const avgSpeaker = await postNext('Magn plus phase average', Array.from(speakerIndices));
+          const avgSpeakerIdx = Object.keys(avgSpeaker.results)[0];
+
+          // Find the subwoofer index
+          let subIdx = nChannels;
+
+          // If we have directional bass (multiple subs), use the first one for now
+          if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+            subIdx = nSpeakers + 1; // First subwoofer
+          }
+
+          console.info(`├─ Using subwoofer index: ${subIdx}`);
+
+          // Apply strategy-specific alignment
+          let result;
+          switch (band.strategy) {
+            case "maximize_output":
+              result = await alignForMaxOutput(avgSpeakerIdx, subIdx, band.start, band.end);
+              break;
+            case "phase_coherent":
+              result = await alignForPhaseCoherence(avgSpeakerIdx, subIdx, band.start, band.end);
+              break;
+            case "precise_timing":
+              result = await alignForPreciseTiming(avgSpeakerIdx, subIdx, band.start, band.end);
+              break;
+          }
+
+          alignmentResults.push({
+            band: band.name,
+            frequency: `${band.start}-${band.end}Hz`,
+            strategy: band.strategy,
+            ...result
+          });
+
+          // Cleanup
+          await postDelete(avgSpeakerIdx);
+
+          console.log(`└─ Result: ${result.requiredDelay.toFixed(2)}ms delay, inverted: ${result.isInverted}`);
+        }
+
+        // Calculate weighted average delay (prioritize crossover region)
+        const weightedDelay = calculateWeightedDelay(alignmentResults);
+        const finalInversion = alignmentResults.find(r => r.strategy === 'phase_coherent').isInverted;
+
+        console.log("\n🎯 FINAL ALIGNMENT:");
+        console.log(`├─ Weighted average delay: ${weightedDelay.toFixed(2)}ms`);
+        console.log(`├─ Subwoofer inversion: ${finalInversion ? 'YES' : 'NO'}`);
+
+        // Apply the alignment to the actual subwoofer measurement
+        const actualSubIdx = window.hasDirectionalBass ? nSpeakers + 1 : nChannels;
+
+        if (finalInversion) {
+          await postSafe(`${baseUrl}/${actualSubIdx}/command`, { command: "Invert" }, "Invert completed");
+        }
+
+        const subMoves = weightedDelay / delaymax;
+        await postNext('Offset t=0', actualSubIdx, { offset: -subMoves, unit: "seconds" });
+
+        // Update all subs if directional
+        if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+            mSec[i] += subMoves;
+            invertSub[i] = finalInversion;
+          }
+        } else {
+          mSec[nChannels] += subMoves;
+          invertSub[nChannels] = finalInversion;
+        }
+
+        console.log("└─ ✓ Frequency-dependent alignment applied\n");
+
+        return { alignmentResults, finalDelay: weightedDelay, finalInversion };
+      }
+
+      // Strategy 1: Maximize output (vector sum magnitude)
+      async function alignForMaxOutput(speakerIdx, subIdx, startFreq, endFreq) {
+        console.info(`   Optimizing for maximum output...`);
+
+        await postNext('Smooth', speakerIdx, { smoothing: "1/12" });
+        await postNext('Smooth', subIdx, { smoothing: "1/12" });
+
+        // const [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+        // Use appropriate delay range based on whether we have directional subs
+        let loDelay, hiDelay;
+        if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+          [loDelay, hiDelay] = getDelayRangeOf(mSec[nSpeakers + 1], 1, nSpeakers);
+        } else {
+          [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+        }
+        let maxOutput = -Infinity;
+        let bestDelay = 0;
+        let bestInvert = false;
+
+        // Test delays
+        for (let testDelay = loDelay; testDelay <= hiDelay; testDelay += 0.5) {
+          for (const invert of [false, true]) {
+            if (noInversion && invert) continue;
+
+            // Simulate alignment
+            const output = await simulateAlignment(speakerIdx, subIdx, testDelay, invert, startFreq, endFreq);
+
+            if (output > maxOutput) {
+              maxOutput = output;
+              bestDelay = testDelay;
+              bestInvert = invert;
+            }
+          }
+        }
+
+        return {
+          requiredDelay: bestDelay,
+          isInverted: bestInvert,
+          metric: maxOutput,
+          metricName: "Total Output (dB)"
+        };
+      }
+
+      // Strategy 2: Phase coherence (minimize phase variation)
+      async function alignForPhaseCoherence(speakerIdx, subIdx, startFreq, endFreq) {
+        console.info(`   Optimizing for phase coherence...`);
+
+        // Reuse your existing align4system logic but focus on phase linearity
+        await postNext('Smooth', speakerIdx, { smoothing: "Var" });
+        await postNext('Smooth', subIdx, { smoothing: "Var" });
+
+        await postSafe("http://localhost:4735/alignment-tool/index-a", speakerIdx, "selected as measurement A");
+        await postSafe("http://localhost:4735/alignment-tool/index-b", subIdx, "selected as measurement B");
+        await postAlign('Reset all');
+
+        // const [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+        // Use appropriate delay range based on whether we have directional subs
+        let loDelay, hiDelay;
+        if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+          [loDelay, hiDelay] = getDelayRangeOf(mSec[nSpeakers + 1], 1, nSpeakers);
+        } else {
+          [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+        }
+        await postSafe("http://localhost:4735/alignment-tool/mode", "Impulse", "Mode set");
+        await postSafe("http://localhost:4735/alignment-tool/max-negative-delay", loDelay, "Maximum negative delay set to");
+        await postSafe("http://localhost:4735/alignment-tool/max-positive-delay", hiDelay, "Maximum positive delay set to");
+
+        let bestPhaseCoherence = Infinity;
+        let bestDelay = 0;
+        let bestInvert = false;
+
+        // Scan through band
+        for (let checkFreq = startFreq; checkFreq <= endFreq; checkFreq += 5) {
+          const postAlignResult = await postAlign('Align IRs', checkFreq);
+          if (postAlignResult.message === 'Delay too large') continue;
+
+          const invertB = await fetchAlign('invert-b');
+          const delayB = parseFloat(await fetchAlign('delay-b'));
+          if (noInversion && invertB) continue;
+
+          // Measure phase coherence
+          const tempSum = await fetchAlign('aligned-frequency-response?smoothing=Var&ppo=96');
+          const phaseCoherence = measurePhaseCoherence(tempSum, startFreq, endFreq);
+
+          if (phaseCoherence < bestPhaseCoherence) {
+            bestPhaseCoherence = phaseCoherence;
+            bestDelay = delayB;
+            bestInvert = invertB;
+          }
+        }
+
+        return {
+          requiredDelay: bestDelay,
+          isInverted: bestInvert,
+          metric: bestPhaseCoherence,
+          metricName: "Phase Variation (degrees)"
+        };
+      }
+
+      // Strategy 3: Precise timing (group delay alignment)
+      async function alignForPreciseTiming(speakerIdx, subIdx, startFreq, endFreq) {
+        console.info(`   Optimizing for precise timing...`);
+
+        // Use group delay for precise timing alignment
+        const speakerGD = await fetchSafe(`group-delay?smoothing=1/6`, speakerIdx);
+        const subGD = await fetchSafe(`group-delay?smoothing=1/6`, subIdx);
+
+        const spkGDArray = response2array(speakerGD, startFreq, endFreq);
+        const subGDArray = response2array(subGD, startFreq, endFreq);
+
+        // Calculate average group delay difference
+        const avgGDDiff = spkGDArray.reduce((sum, val, idx) =>
+          sum + (val - subGDArray[idx]), 0) / spkGDArray.length;
+
+        const requiredDelay = avgGDDiff * 1000; // Convert to ms
+        // const [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+        // Use appropriate delay range based on whether we have directional subs
+        let loDelay, hiDelay;
+        if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+          [loDelay, hiDelay] = getDelayRangeOf(mSec[nSpeakers + 1], 1, nSpeakers);
+        } else {
+          [loDelay, hiDelay] = getDelayRangeOfFinalSub();
+        }
+
+        // Constrain to available range
+        const finalDelay = Math.max(loDelay, Math.min(hiDelay, requiredDelay));
+
+        return {
+          requiredDelay: finalDelay,
+          isInverted: false,
+          metric: Math.abs(avgGDDiff),
+          metricName: "Group Delay Match (ms)"
+        };
+      }
+
+      // Helper: Simulate alignment and return output level
+      async function simulateAlignment(speakerIdx, subIdx, delay, invert, startFreq, endFreq) {
+        // This is a simplified simulation - in practice you'd use REW's alignment tool
+        const spkResponse = await fetchSafe('frequency-response?smoothing=1%2F12&ppo=96', speakerIdx);
+        const subResponse = await fetchSafe('frequency-response?smoothing=1%2F12&ppo=96', subIdx);
+
+        const spkArray = response2array(spkResponse, startFreq, endFreq);
+        const subArray = response2array(subResponse, startFreq, endFreq);
+
+        // Simplistic magnitude sum (real implementation would use complex math)
+        let totalOutput = 0;
+        for (let i = 0; i < spkArray.length; i++) {
+          const spkMag = Math.pow(10, spkArray[i] / 20);
+          let subMag = Math.pow(10, subArray[i] / 20);
+          if (invert) subMag *= -1;
+
+          const combined = spkMag + subMag;
+          totalOutput += 20 * Math.log10(Math.abs(combined));
+        }
+
+        return totalOutput / spkArray.length;
+      }
+
+      // Helper: Measure phase coherence (lower is better)
+      function measurePhaseCoherence(response, startFreq, endFreq) {
+        const phaseArray = response2arrayPhase(response, startFreq, endFreq);
+        if (!phaseArray) return Infinity;
+
+        // Calculate phase variation
+        let maxPhaseChange = 0;
+        for (let i = 1; i < phaseArray.length; i++) {
+          const change = Math.abs(phaseArray[i] - phaseArray[i - 1]);
+          maxPhaseChange = Math.max(maxPhaseChange, change);
+        }
+
+        return maxPhaseChange;
+      }
+
+      // Calculate weighted average delay (prioritize crossover region 60-100Hz)
+      function calculateWeightedDelay(alignmentResults) {
+        const weights = {
+          "Deep Bass (20-40Hz)": 0.2,
+          "Low Bass (40-80Hz)": 0.5,    // Highest weight - crossover region
+          "Upper Bass (80-150Hz)": 0.3
+        };
+
+        let weightedSum = 0;
+        let totalWeight = 0;
+
+        for (const result of alignmentResults) {
+          const weight = weights[result.band] || 0.33;
+          weightedSum += result.requiredDelay * weight;
+          totalWeight += weight;
+        }
+
+        return weightedSum / totalWeight;
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // INTEGRATION HELPER: Modified optimizeSubDelay() replacement
+      // ═══════════════════════════════════════════════════════════════════════════
+      async function optimizeSubDelayART() {
+        console.log("");
+        console.log("╔═══════════════════════════════════════════════════════════════╗");
+        console.log("║  NART > ART-INSPIRED BASS OPTIMIZATION                        ║");
+        console.log("╚═══════════════════════════════════════════════════════════════╝");
+
+        // Check if we have directional subs that need special handling
+        if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+          console.log(`\n🎯 Detected ${window.preCombinedSubCount} directional subwoofers`);
+          console.log("ART will optimize each subwoofer independently before combining");
+        }
+
+        // Step 1: Analyze room modes (enhanced version)
+        await analyzeRoomModesEnhanced();
+
+        // Step 2: Optimize multi-speaker bass (all capable speakers + individual subs)
+        await optimizeMultiSpeakerBass();
+
+        // Step 3: Frequency-dependent alignment (on individual subs if directional)
+        await frequencyDependentAlignment();
+
+        console.log("✓ NART > ART-INSPIRED bass optimization complete!");
+
+        if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+          console.log(`✓ Optimized ${window.preCombinedSubCount} subwoofers independently`);
+          console.log("They will be combined in the next step with optimized alignment preserved\n");
+        }
+      }
+
+      async function convertDirectionalIfNeeded() {
+        if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+          console.log("\n⚡ Converting directional bass to standard after ART optimization...");
+          await directional2standard();
+        }
       }
 
       async function drawResults() {

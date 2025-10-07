@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.11 - 27-09-2025 @ 20:08
+// ClariQ Next 0.0.12 - 07-10-2025 @ 17:45
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -1438,6 +1438,17 @@ document.addEventListener("DOMContentLoaded", function () {
 						updateContinueButtonState();
 						(async () => {
 							try {
+								console.log("🔧 NART ART A-like start...");
+								if (typeof optimizeSubDelayART === "function") {
+									await optimizeSubDelayART();
+								}
+								// await optimizeSubDelayART(); // NEW STEP 8A - run BEFORE combining subs
+								if (typeof convertDirectionalIfNeeded === "function") {
+									await convertDirectionalIfNeeded();
+								}
+								console.log("🔧 NART ART-like Done...");
+								// await convertDirectionalIfNeeded(); // NEW STEP 8B - NOW combine subs
+
 								// ADD THIS: Detect SBIR before filter generation
 								console.log("🔧 Detect SBIR before filter generation...");
 								if (typeof detectSBIRFromMeasurements === "function") {
