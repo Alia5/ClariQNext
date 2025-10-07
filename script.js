@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.12 - 07-10-2025 @ 17:45
+// ClariQ Next 0.0.13 - 08-10-2025 @ 00:50
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -1152,6 +1152,10 @@ document.addEventListener("DOMContentLoaded", function () {
 				console.info("Advanced Filter: none");
 				// "competitive", "immersive", "voice", "balanced", or null
 				AdvancedFiltersType = "null";
+			} else if (e.target.value == "CUSTOMadvanced") {
+				console.warn("Advanced custom filters");
+				// Hearing loss type: "research", "moderate", "severe", "original", or null
+				AdvancedFiltersType = "CUSTOMadvanced";
 			} else if (e.target.value == "DIALOGadvanced") {
 				console.warn("Advanced Dialog Enhancement CEDIA RP22");
 				// Hearing loss type: "research", "moderate", "severe", "original", or null
@@ -1438,7 +1442,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						updateContinueButtonState();
 						(async () => {
 							try {
-								console.log("🔧 NART ART A-like start...");
+								console.log("🔧 NART start...");
 								if (typeof optimizeSubDelayART === "function") {
 									await optimizeSubDelayART();
 								}
@@ -1446,7 +1450,7 @@ document.addEventListener("DOMContentLoaded", function () {
 								if (typeof convertDirectionalIfNeeded === "function") {
 									await convertDirectionalIfNeeded();
 								}
-								console.log("🔧 NART ART-like Done...");
+								console.log("🔧 NART Done...");
 								// await convertDirectionalIfNeeded(); // NEW STEP 8B - NOW combine subs
 
 								// ADD THIS: Detect SBIR before filter generation

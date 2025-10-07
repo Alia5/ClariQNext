@@ -10,13 +10,18 @@
     href='https://cdnjs.cloudflare.com/ajax/libs/simple-line-icons/2.5.5/css/simple-line-icons.min.css'>
   <link rel="stylesheet" href="./style.css">
   <meta name="googlebot" content="notranslate" />
+  <!-- stop cache -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <!-- stop cache -->
 </head>
 
 <body data-theme="dark">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.12 - 07-10-2025 @ 17:45";
+    const nextversion = "ClariQ Next 0.0.13 - 08-10-2025 @ 00:50";
     // ClearCurve
     let isClearCurve = false;
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
@@ -98,6 +103,214 @@
     let lowFreq, highFreq;
     let IsCustomMeasurements = false;
   </script>
+
+  <!-- CUSTOM FILTERS -->
+  <script>
+    var customFiltersArray = []; // Use var to ensure global scope
+
+    function toggleCustomFilterBuilder() {
+      const selectedType = document.getElementById('script_af_type').value;
+      const builder = document.getElementById('customFilterBuilder');
+
+      if (selectedType === 'CUSTOMadvanced') {
+        builder.style.display = 'block';
+        // Initialize with one empty filter if none exist
+        if (customFiltersArray.length === 0) {
+          addCustomFilter();
+        }
+      } else {
+        builder.style.display = 'none';
+      }
+    }
+
+    function addCustomFilter() {
+      if (customFiltersArray.length >= 20) {
+        alert('Maximum of 20 filters reached!');
+        return;
+      }
+
+      const filterIndex = customFiltersArray.length;
+      const filter = {
+        type: 'PK',
+        frequency: 1000,
+        gaindB: 0,
+        q: 1.0
+      };
+
+      customFiltersArray.push(filter);
+      renderFiltersList();
+      updateFilterCount();
+    }
+
+    function removeCustomFilter(index) {
+      customFiltersArray.splice(index, 1);
+      renderFiltersList();
+      updateFilterCount();
+    }
+
+    function updateFilter(index, field, value) {
+      if (field === 'type') {
+        customFiltersArray[index][field] = value;
+        // Reset Q for non-PK filters
+        if (value !== 'PK') {
+          customFiltersArray[index].q = 1.0;
+        }
+      } else if (field === 'frequency') {
+        customFiltersArray[index][field] = parseFloat(value) || 1000;
+      } else if (field === 'gaindB') {
+        customFiltersArray[index][field] = parseFloat(value) || 0;
+      } else if (field === 'q') {
+        customFiltersArray[index][field] = parseFloat(value) || 1.0;
+      }
+      renderFiltersList(); // Re-render to show/hide Q field
+    }
+
+    function renderFiltersList() {
+      const container = document.getElementById('customFiltersList');
+
+      if (customFiltersArray.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No filters added. Click "Add Filter" to get started.</div>';
+        return;
+      }
+
+      container.innerHTML = customFiltersArray.map((filter, index) => `
+    <div class="filter-row">
+      <div class="row align-items-center">
+        <div class="col-auto">
+          <span class="filter-number">${index + 1}</span>
+        </div>
+        
+        <div class="col-md-2">
+          <label class="form-label">Type</label>
+          <select class="form-select" onchange="updateFilter(${index}, 'type', this.value)">
+            <option value="PK" ${filter.type === 'PK' ? 'selected' : ''}>Peak (PK)</option>
+            <option value="LS" ${filter.type === 'LS' ? 'selected' : ''}>Low Shelf (LS)</option>
+            <option value="HS" ${filter.type === 'HS' ? 'selected' : ''}>High Shelf (HS)</option>
+            <!-- HP and LP commented out - conflicts with bass management
+            <option value="HP" ${filter.type === 'HP' ? 'selected' : ''}>High Pass (HP)</option>
+            <option value="LP" ${filter.type === 'LP' ? 'selected' : ''}>Low Pass (LP)</option>
+            -->
+          </select>
+        </div>
+        
+        <div class="col-md-2">
+          <label class="form-label">Frequency (Hz)</label>
+          <input type="number" class="form-control" value="${filter.frequency}" 
+                 min="10" max="20000" step="1"
+                 onchange="updateFilter(${index}, 'frequency', this.value)">
+        </div>
+        
+        <div class="col-md-2">
+          <label class="form-label">Gain (dB)</label>
+          <input type="number" class="form-control" value="${filter.gaindB}" 
+                 min="-20" max="20" step="0.1"
+                 onchange="updateFilter(${index}, 'gaindB', this.value)">
+        </div>
+        
+        ${filter.type === 'PK' ? `
+        <div class="col-md-2">
+          <label class="form-label">Q Factor</label>
+          <input type="number" class="form-control" value="${filter.q}" 
+                 min="0.1" max="10" step="0.1"
+                 onchange="updateFilter(${index}, 'q', this.value)">
+        </div>
+        ` : '<div class="col-md-2"><small class="text-muted">Q N/A</small></div>'}
+        
+        <div class="col-md-2">
+          <label class="form-label d-block">&nbsp;</label>
+          <button type="button" class="btn btn-danger btn-sm w-100" 
+                  onclick="removeCustomFilter(${index})">
+            🗑️ Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+    }
+
+    function updateFilterCount() {
+      const count = customFiltersArray.length;
+      document.getElementById('filterCount').textContent = count;
+      document.getElementById('filterWarning').style.display = count >= 20 ? 'inline' : 'none';
+    }
+
+    function loadFilterTemplate(template) {
+      customFiltersArray = [];
+
+      switch (template) {
+        case 'bass':
+          customFiltersArray = [
+            { type: 'PK', frequency: 60, gaindB: 4.0, q: 0.7 },
+            { type: 'PK', frequency: 100, gaindB: 3.0, q: 1.0 },
+            { type: 'PK', frequency: 200, gaindB: 2.0, q: 1.2 }
+          ];
+          break;
+
+        case 'treble':
+          customFiltersArray = [
+            { type: 'PK', frequency: 5000, gaindB: 2.0, q: 1.5 },
+            { type: 'PK', frequency: 8000, gaindB: 3.0, q: 1.5 },
+            { type: 'HS', frequency: 10000, gaindB: 2.5, q: 1.0 }
+          ];
+          break;
+
+        case 'vshape':
+          customFiltersArray = [
+            { type: 'PK', frequency: 60, gaindB: 4.0, q: 0.8 },
+            { type: 'PK', frequency: 250, gaindB: -2.0, q: 1.0 },
+            { type: 'PK', frequency: 1000, gaindB: -3.0, q: 0.8 },
+            { type: 'PK', frequency: 3000, gaindB: 2.0, q: 1.5 },
+            { type: 'PK', frequency: 8000, gaindB: 3.0, q: 1.5 },
+            { type: 'HS', frequency: 12000, gaindB: 2.0, q: 1.0 }
+          ];
+          break;
+
+        case 'flat':
+          // Removed HP filter - use neutral PK instead
+          customFiltersArray = [
+            { type: 'PK', frequency: 1000, gaindB: 0, q: 1.0 }
+          ];
+          break;
+      }
+
+      renderFiltersList();
+      updateFilterCount();
+    }
+
+    function clearAllFilters() {
+      if (customFiltersArray.length > 0 && !confirm('Clear all filters?')) {
+        return;
+      }
+      customFiltersArray = [];
+      renderFiltersList();
+      updateFilterCount();
+    }
+
+    // Export function to get custom filters for the main script
+    function getCustomFilters() {
+      return {
+        filters: customFiltersArray,
+        description: document.getElementById('customFilterDescription').value || 'Custom User-Defined EQ'
+      };
+    }
+
+    function debugCustomFilters() {
+      console.log("=== CUSTOM FILTERS DEBUG ===");
+      console.log("customFiltersArray exists?", typeof customFiltersArray !== 'undefined');
+      console.log("customFiltersArray value:", customFiltersArray);
+      console.log("customFiltersArray length:", customFiltersArray ? customFiltersArray.length : 'N/A');
+      console.log("getCustomFilters function exists?", typeof getCustomFilters !== 'undefined');
+
+      if (typeof getCustomFilters === 'function') {
+        const config = getCustomFilters();
+        console.log("getCustomFilters() returns:", config);
+      }
+
+      alert("Check the console for debug information!");
+    }
+
+  </script>
+
   <!-- partial -->
   <script src="./script.js"></script>
   <!-- Include jsPDF library first -->
@@ -220,13 +433,14 @@
           <div class="row g-4">
             <div class="col-md-4">
               <label for="script_af_type">Advanced Filters Type</label><br>
-              <select name="script_af_type" id="script_af_type">
+              <select name="script_af_type" id="script_af_type" onchange="toggleCustomFilterBuilder()">
                 <option value="null" selected>none</option>
+                <option value="CUSTOMadvanced">🎛️ Custom Filters (Build Your Own)</option>
                 <option value="DIALOGadvanced">Advanced Dialog Enhancement - CEDIA RP22</option>
                 <option value="HLOSSresearch">Hearing Loss >> Research-Based Hearing Loss Compensation (presbycusis
                   patterns)</option>
-                <option value="HLOSSmoderate">Hearing Loss >> Moderate Hearing Loss Compensationmoderate (mild hearing
-                  loss)</option>
+                <option value="HLOSSmoderate">Hearing Loss >> Moderate Hearing Loss Compensation (mild hearing loss)
+                </option>
                 <option value="HLOSSsevere">Hearing Loss >> Severe Hearing Loss Compensation (⚠️high gains)</option>
                 <option value="HLOSSoriginal">Hearing Loss >> original / ClariQ Next 0.0.3 values</option>
                 <option value="GAMINGcompetitive">Gaming >> Competitive Gaming EQ (Footsteps & Tactical Audio)</option>
@@ -234,6 +448,65 @@
                 <option value="GAMINGvoice">Gaming >> Voice Chat Gaming EQ (Clear Communication)</option>
                 <option value="GAMINGbalanced">Gaming >> Balanced Gaming EQ (All-Purpose)</option>
               </select>
+            </div>
+          </div>
+
+          <!-- Custom Filter Builder (hidden by default) -->
+          <div id="customFilterBuilder" style="display: none;" class="mt-4">
+            <div class="card">
+              <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">🎛️ Custom Filter Builder</h5>
+                <small>Create up to 20 custom EQ filters (Peak, Low Shelf, High Shelf only)</small>
+              </div>
+              <div class="card-body">
+                <!-- Filter Description -->
+                <div class="row mb-3">
+                  <div class="col-md-8">
+                    <label for="customFilterDescription">Filter Set Name</label>
+                    <input type="text" id="customFilterDescription" class="form-control" placeholder="My Custom EQ"
+                      value="Custom User-Defined EQ">
+                  </div>
+                  <div class="col-md-4 d-flex align-items-end">
+                    <button type="button" class="btn btn-success w-100" onclick="addCustomFilter()">
+                      ➕ Add Filter
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Filters List -->
+                <div id="customFiltersList" class="mb-3">
+                  <!-- Filters will be added here dynamically -->
+                </div>
+
+                <!-- Filter Count Display -->
+                <div class="alert alert-info">
+                  <strong>Filters: <span id="filterCount">0</span> / 20</strong>
+                  <span id="filterWarning" style="display: none; color: #dc3545;"> - Maximum reached!</span>
+                  <small class="d-block mt-1">
+                    ℹ️ Custom filters override from high to low frequency (indices 20→1)<br>
+                    This preserves critical low-frequency room correction
+                  </small>
+                </div>
+
+                <!-- Preset Templates -->
+                <div class="row mt-3">
+                  <div class="col-12">
+                    <label>Quick Templates:</label>
+                    <div class="btn-group w-100" role="group">
+                      <button type="button" class="btn btn-outline-secondary btn-sm"
+                        onclick="loadFilterTemplate('bass')">Bass Boost</button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm"
+                        onclick="loadFilterTemplate('treble')">Treble Boost</button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm"
+                        onclick="loadFilterTemplate('vshape')">V-Shape</button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm"
+                        onclick="loadFilterTemplate('flat')">Flat/Neutral</button>
+                      <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearAllFilters()">Clear
+                        All</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1491,8 +1764,11 @@
         } else {
           console.info(`  Advanced Filters: ${AdvancedFilters}`);
         }
+
         if (AdvancedFilters == true && AdvancedFiltersType == "null") {
           console.info(`  Advanced Filters Type: none`);
+        } else if (AdvancedFilters == true && AdvancedFiltersType == "CUSTOMadvanced") {
+          console.warn(`  Advanced Filters Type: custom filters active`);
         } else if (AdvancedFilters == true && AdvancedFiltersType == "DIALOGadvanced") {
           console.warn(`  Advanced Filters Type: Advanced Dialog Enhancement CEDIA RP22`);
         } else if (AdvancedFilters == true && AdvancedFiltersType == "HLOSSresearch") {
@@ -2206,7 +2482,18 @@
       // PROPRIETARY FILTER GENERATION AND CHECKING ! 
       // CAN NOT BE USED WITHOUT EXPLICIT PERMISSION OF NVEXX !
       // ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-      async function generateFilters() {
+      // async function generateFilters() {
+
+      // Before calling generateFilters(), get the custom config
+      AdvancedFiltersType = document.getElementById('script_af_type').value;
+      let customFiltersConfig = null;
+
+      if (AdvancedFiltersType === 'CUSTOMadvanced') {
+        customFiltersConfig = getCustomFilters();
+        console.log("Custom filters config:", customFiltersConfig); // Debug log
+      }
+
+      async function generateFilters(customFiltersConfig = null) {
         console.log(`Generating min. phase EQ filters...`);
         // ===== FILTER CONFIGURATION =====
         // Set these variables to enable different filter types:
@@ -2230,8 +2517,82 @@
           ...(type !== "HP" && { gaindB }), // All except HP have gaindB
           ...(type === "PK" && { q })        // Only PK filters have q
         });
+
         const getAdvancedFilters = (type) => {
           switch (type) {
+            case "CUSTOMadvanced":
+              // Read custom filters directly from the global array
+              let customFilters = [];
+              let customDescription = "Custom User-Defined EQ";
+
+              if (typeof customFiltersArray !== 'undefined' && customFiltersArray.length > 0) {
+                customFilters = customFiltersArray;
+                const descInput = document.getElementById('customFilterDescription');
+                if (descInput) {
+                  customDescription = descInput.value || customDescription;
+                }
+              } else if (typeof getCustomFilters === 'function') {
+                const config = getCustomFilters();
+                customFilters = config.filters || [];
+                customDescription = config.description || customDescription;
+              }
+
+              // Validate
+              if (!customFilters || customFilters.length === 0) {
+                console.warn("Custom filter type selected but no custom filters defined!");
+                return null;
+              }
+
+              if (customFilters.length > 20) {
+                console.error(`Custom filters exceed maximum of 20 filters (found ${customFilters.length})`);
+                return null;
+              }
+
+              console.log("✅ Loading custom filters:", customFilters);
+
+              // CRITICAL: Start from index 20 and count DOWN (reverse order)
+              // This preserves critical low-frequency REW filters and overwrites high-frequency ones first
+              // REW fills 1→15 (low to high freq), custom fills 20→1 (high to low freq)
+              const startIndex = 20;
+              const rewFilters = customFilters.map((filter, idx) => {
+                const filterIndex = startIndex - idx; // 20, 19, 18, 17, 16...
+                console.log(`Creating custom filter at index ${filterIndex}:`, filter);
+                return createREWFilter(
+                  filterIndex,
+                  filter.type,
+                  filter.frequency,
+                  filter.gaindB || 0,
+                  filter.q || 1.0
+                );
+              });
+
+              // Sort filters by index (descending) to apply from high to low
+              rewFilters.sort((a, b) => b.index - a.index);
+
+              // Generate target descriptions
+              const targets = customFilters.map((filter) => {
+                let desc = `- ${filter.frequency}Hz: `;
+                if (filter.type === "PK") {
+                  desc += `${filter.gaindB >= 0 ? '+' : ''}${filter.gaindB}dB (Q=${filter.q})`;
+                } else if (filter.type === "HS" || filter.type === "LS") {
+                  desc += `${filter.gaindB >= 0 ? '+' : ''}${filter.gaindB}dB ${filter.type} shelf`;
+                }
+                /* HP and LP commented out - conflicts with bass management
+                else if (filter.type === "HP") {
+                  desc += `High-pass filter`;
+                } else if (filter.type === "LP") {
+                  desc += `Low-pass filter`;
+                }
+                */
+                return desc;
+              });
+
+              return {
+                filters: rewFilters,
+                description: customDescription,
+                targets: targets
+              };
+
             case "DIALOGadvanced":
               return {
                 filters: [
@@ -2473,7 +2834,7 @@
             if (AdvancedFiltersType === "DIALOGadvanced") {
               if (commandId[i] === "C") {
                 // Apply DIALOGadvanced filter to center channel
-                const AdvanedFiltersConfig = getAdvancedFilters(AdvancedFiltersType);
+                const AdvanedFiltersConfig = getAdvancedFilters(AdvancedFiltersType, customFiltersConfig);
                 if (AdvanedFiltersConfig) {
                   console.log(`APPLYING ${AdvanedFiltersConfig.description} to:`, commandId[i]);
                   console.info("Advanced Filter Optimization Targets:");
@@ -2492,7 +2853,7 @@
               // If not center channel, do nothing (skip)
             } else {
               // For all other filter types, apply to all non-subwoofer channels
-              const AdvanedFiltersConfig = getAdvancedFilters(AdvancedFiltersType);
+              const AdvanedFiltersConfig = getAdvancedFilters(AdvancedFiltersType, customFiltersConfig);
               if (AdvanedFiltersConfig) {
                 console.log(`APPLYING ${AdvanedFiltersConfig.description} to:`, commandId[i]);
                 console.info("Advanced Filter Optimization Targets:");
@@ -2728,14 +3089,15 @@
       // Display SBIR results
       function displaySBIRResults() {
         if (!window.detectedSBIR || window.detectedSBIR.length === 0) return;
-        console.log("\n🔊 SBIR (BOUNDARY INTERFERENCE) ANALYSIS:");
+        console.log("");
+        console.log("🔊 SBIR (BOUNDARY INTERFERENCE) ANALYSIS:");
         console.log("═".repeat(50));
         for (const sbir of window.detectedSBIR) {
           // console.warn(`\n${sbir.speaker}:`);
           console.warn(`${sbir.speaker}:`);
           console.log(`├─ Estimated boundary distance: ${sbir.estimatedBoundaryDistance.toFixed(2)}m`);
           console.log(`├─ Severity: ${sbir.severity.toUpperCase()}`);
-          console.log(`├─ Null frequencies: ${sbir.nullFrequencies.map(f => f.toFixed(0) + 'Hz').join(', ')}`);
+          console.log(`└─ Null frequencies: ${sbir.nullFrequencies.map(f => f.toFixed(0) + 'Hz').join(', ')}`);
           if (sbir.estimatedBoundaryDistance < 0.6) {
             console.log(`└─ ⚠️ RECOMMENDATION: Move speaker at least ${(0.6 - sbir.estimatedBoundaryDistance).toFixed(1)}m away from wall`);
             console.log(`--`);
@@ -4236,7 +4598,7 @@
       // STEP 1: Enhanced Room Mode Detection (beyond SBIR boundary interference)
       // ───────────────────────────────────────────────────────────────────────────
       async function analyzeRoomModesEnhanced() {
-        console.log("\n🎯 ANALYZING ROOM MODES (Standing Waves)...");
+        console.log("├─ ANALYZING ROOM MODES (Standing Waves)...");
         console.log("═".repeat(60));
 
         const roomModes = {
@@ -4271,7 +4633,8 @@
         // Store globally for use by other functions
         window.detectedRoomModes = roomModes;
 
-        console.log("\n📊 ROOM MODE SUMMARY:");
+        console.log("");
+        console.log("📊 ROOM MODE SUMMARY:");
         const allModes = Object.values(roomModes.speakers)
           .flatMap(s => s.modes)
           .map(m => m.frequency)
@@ -4352,7 +4715,8 @@
           return;
         }
 
-        console.log("\n🔊 MULTI-SPEAKER BASS OPTIMIZATION (NART > ART-INSPIRED)");
+        console.log("");
+        console.log("🔊 NART MULTI-SPEAKER BASS OPTIMIZATION");
         console.log("═".repeat(60));
         console.log("Analyzing which speakers can contribute to modal cancellation...");
 
@@ -4385,8 +4749,10 @@
           return;
         }
 
-        console.log(`\n✓ Found ${bassCapableSpeakers.length} bass-capable speakers`);
-        console.log("Calculating optimal multi-speaker alignment for modal control...\n");
+        console.log("");
+        console.log(`✓ Found ${bassCapableSpeakers.length} bass-capable speakers`);
+        console.log("Calculating optimal multi-speaker alignment for modal control...");
+        console.log("");
 
         // Optimize in frequency bands (ART-style)
         const optimizationResults = {
@@ -4399,10 +4765,12 @@
         window.multiSpeakerBassOptimization = optimizationResults;
 
         // Display results
-        console.log("\n📊 OPTIMIZATION RESULTS:");
+        console.log("");
+        console.log("📊 OPTIMIZATION RESULTS:");
         console.log("─".repeat(60));
         for (const [band, result] of Object.entries(optimizationResults)) {
-          console.log(`\n${band}:`);
+          console.log("");
+          console.log(`${band}:`);
           console.log(`├─ Improvement: ${result.improvement.toFixed(1)}dB reduction in modal peaks`);
           console.log(`├─ Speakers contributing: ${result.contributingSpeakers.join(', ')}`);
           if (result.recommendedDelays && Object.keys(result.recommendedDelays).length > 0) {
@@ -4509,7 +4877,8 @@
           return;
         }
 
-        console.log("\n🎛️ FREQUENCY-DEPENDENT ALIGNMENT (ART-Style)");
+        console.log("");
+        console.log("🎛️ NART FREQUENCY-DEPENDENT ALIGNMENT");
         console.log("═".repeat(60));
         console.log("Using different alignment strategies per frequency band...");
 
@@ -4544,7 +4913,8 @@
         const alignmentResults = [];
 
         for (const band of bands) {
-          console.log(`\n📍 ${band.name}:`);
+          console.log("");
+          console.log(`${band.name}:`);
           console.log(`├─ Strategy: ${band.strategy}`);
           console.log(`├─ Goal: ${band.description}`);
 
@@ -4839,7 +5209,7 @@
 
         // Check if we have directional subs that need special handling
         if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
-          console.log(`\n🎯 Detected ${window.preCombinedSubCount} directional subwoofers`);
+          console.log(`├─ Detected ${window.preCombinedSubCount} directional subwoofers`);
           console.log("ART will optimize each subwoofer independently before combining");
         }
 
@@ -4862,7 +5232,8 @@
 
       async function convertDirectionalIfNeeded() {
         if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
-          console.log("\n⚡ Converting directional bass to standard after ART optimization...");
+          console.log("");
+          console.log("⚡ Converting directional bass to standard after NART optimization...");
           await directional2standard();
         }
       }
@@ -4883,6 +5254,7 @@
           finalResponseName += (AdvancedFilters && AdvancedFiltersType === "GAMINGimmersive") ? "-AGF" : "";
           finalResponseName += (AdvancedFilters && AdvancedFiltersType === "GAMINGvoice") ? "-AGF" : "";
           finalResponseName += (AdvancedFilters && AdvancedFiltersType === "GAMINGbalanced") ? "-AGF" : "";
+          finalResponseName += (AdvancedFilters && AdvancedFiltersType === "CUSTOMadvanced") ? "-ACF" : "";
           finalResponseName += isLarge ? "-Large" : `-${customCrossover[i]}hz-xo`;
           const eqSpeaker = nChannels + 2 * i;
           const spWithHPF = await genSpeaker(eqSpeaker, customCrossover[i]);
@@ -5114,6 +5486,7 @@
             + (AdvancedFiltersType === "GAMINGimmersive" ? "AGF_" : "")
             + (AdvancedFiltersType === "GAMINGvoice" ? "AGF_" : "")
             + (AdvancedFiltersType === "GAMINGbalanced" ? "AGF_" : "")
+            + (AdvancedFiltersType === "CUSTOMadvanced" ? "ACF_" : "")
             + (isRP22mode ? "RP22_" : "")
             + (isDolbymode ? "DOLBY_" : "")
             + (isTHXmode ? "THX_" : "")
@@ -5620,8 +5993,8 @@
           console.log("--- SUBWOOFERS ---");
           for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
             console.log(`└─ ${commandId[i]}: ${customLevel[i].toFixed(1)}dB`);
-            console.info(`─────────────────────────────────────────────────────────`);
           }
+          console.info(`─────────────────────────────────────────────────────────`);
         }
         // Apply target level correction to all channels
         for (let i = 1; i <= nSpeakers; i++) {
@@ -5649,8 +6022,8 @@
           for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
             const change = customLevel[i] - originalTrims[i];
             console.log(`└─ ${commandId[i]}: ${originalTrims[i].toFixed(1)}dB → ${customLevel[i].toFixed(1)}dB (${change >= 0 ? '+' : ''}${change.toFixed(1)}dB)`);
-            console.info(`─────────────────────────────────────────────────────────`);
           }
+          console.info(`─────────────────────────────────────────────────────────`);
         }
         // Final analysis relative to 75dB standard
         const normalizedTrims = customLevel.slice(1, totalChannels + 1);
