@@ -1,4 +1,4 @@
-// ClariQ Next 0.0.13 - 08-10-2025 @ 00:50
+// ClariQ Next 0.0.14 - 08-10-2025 @ 13:44
 // Cross-browser compatibility fixes (keeping original structure)
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -1544,6 +1544,14 @@ document.addEventListener("DOMContentLoaded", function () {
 				if (currentStep === 10) {
 					// ClariQ Next
 					if (isClearCurve == false) {
+						// Check if NART already handled subwoofer optimization
+						if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+							console.log("✓ Skipping step 10 - NART already optimized directional bass");
+							optimizeSubDelayCompleted = true;
+							updateContinueButtonState();
+							return; // Skip this step entirely
+						}
+						// Check if NART already handled subwoofer optimization
 						console.log("Reached step 10 - triggering Optimize subwoofer(s) delay ");
 						optimizeSubDelayCompleted = false;
 						updateContinueButtonState();

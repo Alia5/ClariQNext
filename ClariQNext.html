@@ -21,7 +21,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.0.13 - 08-10-2025 @ 00:50";
+    const nextversion = "ClariQ Next 0.0.14 - 08-10-2025 @ 13:44";
     // ClearCurve
     let isClearCurve = false;
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
@@ -1635,7 +1635,7 @@
             await fetch_mREW(resultIndex, 'PUT', { title: name });
             console.log(`✓ Completed processing measurement ${i}`);
           } catch (error) {
-            console.error(`❌ FAILED processing measurement ${i} (${measurements[i].title}):`, error);
+            console.error(`X FAILED processing measurement ${i} (${measurements[i].title}):`, error);
             // Additional debugging for the failed case
             console.log("=== FAILURE DEBUG ===");
             console.log("Error type:", error.constructor.name);
@@ -1666,7 +1666,7 @@
           // Try the original addmicCal first
           await addmicCalDebug();
         } catch (error) {
-          console.error("❌ Microphone calibration failed:", error);
+          console.error("X Microphone calibration failed:", error);
           // Ask user if they want to continue without microcal
           const skipMicCal = confirm(
             "Microphone calibration failed. This might be due to a REW version compatibility issue.\n\n" +
@@ -2548,7 +2548,7 @@
                 return null;
               }
 
-              console.log("✅ Loading custom filters:", customFilters);
+              console.log("✓ Loading custom filters:", customFilters);
 
               // CRITICAL: Start from index 20 and count DOWN (reverse order)
               // This preserves critical low-frequency REW filters and overwrites high-frequency ones first
@@ -3102,7 +3102,7 @@
             console.log(`└─ ⚠️ RECOMMENDATION: Move speaker at least ${(0.6 - sbir.estimatedBoundaryDistance).toFixed(1)}m away from wall`);
             console.log(`--`);
           } else if (sbir.severity === 'severe') {
-            console.log(`   ❌ Severe SBIR detected - EQ cannot fix this, repositioning required!`);
+            console.log(`   X Severe SBIR detected - EQ cannot fix this, repositioning required!`);
             console.log(`--`);
           } else {
             console.log(`--`);
@@ -3362,6 +3362,7 @@
         return Math.max(rolloff, start);
       }
 
+      /*
       // let modeSpkMin = 20; let modeSpkMax = 20000;
       async function getAbsLow3dBPointForSpk(idx, start = modeSpkMin, end = modeSpkMax) {
         // finds high -3dB point from mean SPL in speaker's optimal midrange >> Use midrange reference band for speakers (not bass range like subs)  
@@ -3373,6 +3374,24 @@
         let rolloff = start;
         for (let i = 0; i < rpArray.length; i++) {
           if ((rpArray[i] - refSPL) >= -3) { break; }
+          rolloff *= octave;
+        }
+        return Math.min(rolloff, end);
+      }
+      */
+      // let modeSpkMin = 20; let modeSpkMax = 20000;
+      async function getAbsLow3dBPointForSpk(idx, start = modeSpkMin, end = modeSpkMax, forNART = false) {
+        const response = await fetchSafe('frequency-response?smoothing=1/48&ppo=96', idx);
+        const rpArray = response2array(response, start, end);
+        const refArray = response2array(response, 500, 2000);
+        const refSPL = refArray.reduce((acc, val) => acc + val, 0) / refArray.length;
+        const octave = Math.pow(2, 1 / 96);
+        let rolloff = start;
+        // ✓ For NART, allow -10dB (speakers can still help with modal cancellation)
+        // For normal use, keep -3dB (speaker should be at full capability)
+        const threshold = forNART ? -10 : -3;
+        for (let i = 0; i < rpArray.length; i++) {
+          if ((rpArray[i] - refSPL) >= threshold) { break; }
           rolloff *= octave;
         }
         return Math.min(rolloff, end);
@@ -4002,6 +4021,7 @@
         return RP22BestXO;
       }
 
+      /*
       async function directional2standard() {
         let measurements = await fetch_mREW();
         let mCount = Object.keys(measurements).length;
@@ -4058,21 +4078,16 @@
           throw new Error("Invalid swIndices[0] array");
         }
         let currSubIdx = swIndices[0][0];
-        // let cmdIds = commandId[currSubIdx];
         let cmdIds = measurements[currSubIdx].title.slice(0, -1);
-        // let minDelay = 0, maxDelay = 0;
         let startFreq = Math.round(await getAbsLow3dBPointForSub(currSubIdx));
         let endFreq = Math.round(await getAbsHigh3dBPointForSub(currSubIdx));
         for (let i = 1; i < swIndices.length; i++) {
           let thisSubIdx = swIndices[i][0];
-          // const thisSubCmdId = commandId[thisSubIdx];
           const thisSubCmdId = measurements[thisSubIdx].title.slice(0, -1);
           const thisSubNumber = parseInt(thisSubCmdId.slice(-1));
           console.log(`Aligning ${thisSubCmdId} to ${cmdIds}...`);
           startFreq = Math.min(startFreq, Math.round(await getAbsLow3dBPointForSub(thisSubIdx)));
           endFreq = Math.max(endFreq, Math.round(await getAbsHigh3dBPointForSub(thisSubIdx)));
-          // const [loDelay, hiDelay] = getDelayRangeOf(mSec[thisSubIdx], nSpeakers + 1, nSpeakers + nSubs);
-          // const [isPossible, requiredDelay, isInverted, sumIndex] = await alignMsub(currSubIdx, thisSubIdx, startFreq, endFreq, loDelay, hiDelay);
           const [loDelay, hiDelay] = getDelayRangeOf(mSec[nSpeakers + thisSubNumber], nSpeakers + 1, nSpeakers + nSubs);
           const [isPossible, requiredDelay, isInverted, sumIndex] = await alignMsub(currSubIdx, thisSubIdx, startFreq, endFreq, loDelay, hiDelay);
           if (!isPossible || !sumIndex) {
@@ -4145,10 +4160,244 @@
         const titles = {};
         let titleIndices = {};
         mCount = Object.keys(measurements).length;
-        let measurementArray = Object.keys(measurements).map((key) => ({
-          index: parseInt(key),
-          title: measurements[key].title,
-        }));
+        for (i = mCount; i >= 1; i--) {
+          const name = measurements[i].title;
+          if (name == "Aligned sum") {
+            console.info("Deleting", name);
+            await postDelete(i);
+            // await new Promise((resolve) => setTimeout(resolve, speedDelay * 2));
+          }
+        }
+
+        // Update the SW name to SW1o
+        // cleanup "Aligned sum" leftover ...
+        measurements = await fetch_mREW();
+        mCount = Object.keys(measurements).length;
+        for (i = mCount; i >= 1; i--) {
+          const name = measurements[i].title;
+          const newname = "SW1o";
+          if (name == "SW10") {
+            console.info("Updating subwoofer name", name);
+            const requestOptions = {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title: newname }),
+            };
+            fetch(`http://localhost:4735/measurements/${i}`, requestOptions);
+          }
+        }
+
+      }
+      */
+      async function directional2standard() {
+        let measurements = await fetch_mREW();
+        let mCount = Object.keys(measurements).length;
+
+        // Check if NART already optimized
+        const nartOptimized = (window.nartOptimizationComplete === true);
+        if (nartOptimized) {
+          console.warn("🎯 NART Mode: Using frequency-dependent alignment (preserving NART optimization)");
+        } else {
+          console.warn("🎯 Traditional Mode: Calculating magnitude-based alignment");
+        }
+
+
+        // Isolate SW commandIds & peak IR times (from your working version)
+        const swCmdIdsWithIRPeak = {};
+        for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+          if (commandId[i] && commandId[i].startsWith("SW")) {
+            // Find the measurement index for this subwoofer
+            let measurementIdx = i;
+            // Adjust for measurement indexing if needed
+            for (let j = 1; j <= mCount; j++) {
+              if (measurements[j].title.startsWith(commandId[i])) {
+                measurementIdx = j;
+                break;
+              }
+            }
+            if (measurements[measurementIdx]) {
+              swCmdIdsWithIRPeak[commandId[i]] = measurements[measurementIdx].timeOfIRPeakSeconds;
+            }
+          }
+        }
+        // Sort subs using peak IR time based on closest to farthest
+        const sortedSwList = Object.entries(swCmdIdsWithIRPeak).sort((a, b) => a[1] - b[1]).map(row => row[0]);
+        console.info(`Alignment order based on IR peak time: ${sortedSwList}`);
+        // Build sorted indices arrays - find existing measurements like SW10, SW11, etc.
+        const swIndices = [];
+        for (let i = 0; i < sortedSwList.length; i++) {
+          const swName = sortedSwList[i]; // e.g., "SW1", "SW2", "SW3"
+          const subNumber = swName.slice(-1); // Extract "1", "2", "3"
+          // Find all measurements for this subwoofer (SW10, SW11, SW12, etc.)
+          const subMeasurements = [];
+          for (let j = 1; j <= mCount; j++) {
+            if (measurements[j] && measurements[j].title.startsWith(`SW${subNumber}`)) {
+              subMeasurements.push(j);
+            }
+          }
+          if (subMeasurements.length > 0) {
+            // Sort by position number (SW10, SW11, SW12...)
+            subMeasurements.sort((a, b) => {
+              const posA = parseInt(measurements[a].title.slice(2));
+              const posB = parseInt(measurements[b].title.slice(2));
+              return posA - posB;
+            });
+            swIndices.push(subMeasurements);
+          }
+        }
+        // Validate swIndices array structure
+        if (!swIndices || swIndices.length === 0) {
+          console.error("No subwoofer indices found for directional2standard conversion");
+          throw new Error("Invalid swIndices array");
+        }
+        if (!swIndices[0] || swIndices[0].length === 0) {
+          console.error("First subwoofer group is empty");
+          throw new Error("Invalid swIndices[0] array");
+        }
+        let currSubIdx = swIndices[0][0];
+        let cmdIds = measurements[currSubIdx].title.slice(0, -1);
+        let startFreq = Math.round(await getAbsLow3dBPointForSub(currSubIdx));
+        let endFreq = Math.round(await getAbsHigh3dBPointForSub(currSubIdx));
+        for (let i = 1; i < swIndices.length; i++) {
+          let thisSubIdx = swIndices[i][0];
+          const thisSubCmdId = measurements[thisSubIdx].title.slice(0, -1);
+          const thisSubNumber = parseInt(thisSubCmdId.slice(-1));
+
+          startFreq = Math.min(startFreq, Math.round(await getAbsLow3dBPointForSub(thisSubIdx)));
+          endFreq = Math.max(endFreq, Math.round(await getAbsHigh3dBPointForSub(thisSubIdx)));
+
+          let requiredDelay, isInverted, sumIndex;
+
+          if (nartOptimized) {
+            // ✓ NART MODE: Use the delays NART already calculated
+            console.log(`├─ ${thisSubCmdId}: Using NART-optimized alignment...`);
+
+            // NART already stored the optimal delays in mSec[] array
+            // We just need to apply them and combine the subs
+
+            // Apply NART's delay to this sub's measurements
+            for (let j = 0; j < swIndices[i].length; j++) {
+              const currentDelay = mSec[nSpeakers + thisSubNumber];
+              await postNext('Offset t=0', swIndices[i][j], { offset: -currentDelay, unit: "seconds" });
+            }
+
+            // Apply NART's inversion if needed
+            isInverted = invertSub[nSpeakers + thisSubNumber];
+            if (isInverted) {
+              for (let j = 0; j < swIndices[i].length; j++) {
+                await postSafe(`${baseUrl}/${swIndices[i][j]}/command`, { command: "Invert" }, "Invert completed");
+              }
+            }
+
+            // Combine this sub with previous combined result
+            const combineResult = await postNext('Vector sum', [currSubIdx, thisSubIdx]);
+            sumIndex = parseInt(Object.keys(combineResult.results)[0]);
+
+            console.log(`├─ ${thisSubCmdId}: NART delay preserved, inverted: ${isInverted}`);
+
+          } else {
+            // X TRADITIONAL MODE: Calculate new alignment from scratch
+            console.log(`Aligning ${thisSubCmdId} to ${cmdIds}...`);
+
+            const [loDelay, hiDelay] = getDelayRangeOf(mSec[nSpeakers + thisSubNumber], nSpeakers + 1, nSpeakers + nSubs);
+            const [isPossible, newDelay, newInvert, newSumIndex] =
+              await alignMsub(currSubIdx, thisSubIdx, startFreq, endFreq, loDelay, hiDelay);
+
+            if (!isPossible || !newSumIndex) {
+              console.error("Failed to align multiple subwoofers!");
+              throw new Error("Subwoofer alignment failed");
+            }
+
+            requiredDelay = newDelay;
+            isInverted = newInvert;
+            sumIndex = newSumIndex;
+
+            mSec[nSpeakers + thisSubNumber] += (requiredDelay / delaymax);
+            invertSub[nSpeakers + thisSubNumber] = isInverted;
+
+            // Apply delay and inversion to measurements
+            for (let j = 0; j < swIndices[i].length; j++) {
+              await postNext('Offset t=0', swIndices[i][j], { offset: -mSec[nSpeakers + thisSubNumber], unit: "seconds" });
+              if (isInverted) {
+                await postSafe(`${baseUrl}/${swIndices[i][j]}/command`, { command: "Invert" }, "Invert completed");
+              }
+            }
+          }
+
+          // Update for next iteration (UNCHANGED)
+          currSubIdx = sumIndex;
+          cmdIds += ` & ${thisSubCmdId}`;
+        }
+        // Cleanup intermediate alignment measurements
+        for (let i = currSubIdx - 1; i > mCount; i--) {
+          await postDelete(i);
+        }
+
+        // ✓ NEW: Cleanup the intermediate "Vector sum" or "Aligned sum" from NART mode
+        if (nartOptimized) {
+          const cleanupMeasurements = await fetch_mREW();
+          const cleanupCount = Object.keys(cleanupMeasurements).length;
+
+          for (let i = 1; i <= cleanupCount; i++) {
+            const title = cleanupMeasurements[i]?.title;
+            if (title === "Vector sum" || title === "Aligned sum") {
+              console.info(`Cleaning up intermediate NART combination: ${title}`);
+              await postDelete(i);
+              break; // Only delete the first one found
+            }
+          }
+        }
+
+        // Normalize median subwoofer delay to t=0
+        const loSWDelay = Math.min(...mSec.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
+        const hiSWDelay = Math.max(...mSec.slice(nSpeakers + 1, nSpeakers + nSubs + 1));
+        const medianSWDelay = (loSWDelay + hiSWDelay) / 2;
+        for (let i = 0; i < swIndices.length; i++) {
+          for (let j = 0; j < swIndices[i].length; j++) {
+            await postNext('Offset t=0', swIndices[i][j], { offset: medianSWDelay, unit: "seconds" });
+          }
+          // Extract actual subwoofer number from measurement title
+          const firstMeasurementIdx = swIndices[i][0];
+          const measurementTitle = measurements[firstMeasurementIdx].title;
+          const actualSubNumber = parseInt(measurementTitle.slice(2, -1)); // Extract from "SW30" -> "3"
+          mSec[nSpeakers + actualSubNumber] -= medianSWDelay;
+        }
+        // Combine subs at the individual position level
+        console.info("Generating combined subwoofer response(s)...");
+        let volAdjust = 0;
+        for (let i = 0; i < swIndices[0].length; i++) {
+          console.infoUpdate(`Generating combined subwoofer response for position #${i + 1}`);
+          const iPosSWIdxs = swIndices.map(row => row[i]);
+          const iPosCombinedSW = await postNext('Vector sum', iPosSWIdxs);
+          const iPosCombinedSWIdx = Object.keys(iPosCombinedSW.results)[0];
+          await fetch_mREW(iPosCombinedSWIdx, 'PUT', { title: `SW1${i}` });
+          if (i === 0) {
+            // Offset multi-sub gain using MLP measurement
+            volAdjust = await getSubTrim(iPosCombinedSWIdx);
+          }
+          await postNext('Add SPL offset', iPosCombinedSWIdx, { offset: volAdjust });
+        }
+        console.infoUpdate(`Generated combined subwoofer response(s) for all positions.`);
+        // Cleanup individual sub measurements
+        console.info("Cleaning up individual subwoofer response(s)...");
+        const individualSWIndices = swIndices.flat().sort(function (a, b) { return a - b; });
+        for (let i = individualSWIndices.length - 1; i >= 0; i--) {
+          await postDelete(individualSWIndices[i]);
+        }
+        console.infoUpdate("Cleaned up individual subwoofer response(s).");
+        // Apply custom level adjustments for newer AVRs
+        if (sOs === 300 && volAdjust != 0) {
+          console.log(`Adjusting combined sub level by ${volAdjust}dB to best follow the target curve...`);
+          for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+            customLevel[i] += volAdjust;
+            console.info(`${commandId[i].padStart(3, ".")} - shifted: ${customLevel[i] - volAdjust}dB → ${customLevel[i]}dB`);
+          }
+        }
+        // cleanup "Aligned sum" leftover ...
+        measurements = await fetch_mREW();
+        const titles = {};
+        let titleIndices = {};
+        mCount = Object.keys(measurements).length;
         for (i = mCount; i >= 1; i--) {
           const name = measurements[i].title;
           if (name == "Aligned sum") {
@@ -4178,23 +4427,17 @@
 
       }
 
-      // ───────────────────────────────────────────────────────────────────────────
-      // Convert directional bass AFTER ART optimization
-      // ───────────────────────────────────────────────────────────────────────────
-      async function convertDirectionalIfNeeded() {
-        if (!window.hasDirectionalBass || window.preCombinedSubCount <= 1) {
-          console.info("✓ No directional bass conversion needed");
-          return;
+      // directional2standard helper for NART 
+      async function combineSubsWithExistingDelays(sub1Idx, sub2Idx, delayMs, invert) {
+        // Apply the pre-calculated delay and inversion to sub2
+        if (invert) {
+          await postSafe(`${baseUrl}/${sub2Idx}/command`, { command: "Invert" }, "Invert completed");
         }
-
-        console.log("\n⚡ CONVERTING DIRECTIONAL BASS TO STANDARD (Post-ART Optimization)");
-        console.log("═".repeat(60));
-        console.warn("Converting optimized directional subs to combined standard bass...");
-
-        await directional2standard();
-
-        console.warn("✓ Directional to standard conversion completed with ART-optimized alignment");
-        console.log("═".repeat(60));
+        await postNext('Offset t=0', sub2Idx, { offset: -delayMs / 1000, unit: "seconds" });
+        // Vector sum (or magnitude average) the aligned subs
+        const sumResult = await postNext('Vector sum', [sub1Idx, sub2Idx]);
+        const sumIndex = Object.keys(sumResult.results)[0];
+        return parseInt(sumIndex);
       }
 
       function response2array(response, start, end, phase = false) {
@@ -4730,7 +4973,7 @@
         const bassCapableSpeakers = [];
 
         for (let i = 1; i <= nSpeakers; i++) {
-          const lowPoint = await getAbsLow3dBPointForSpk(i, 20, 150);
+          const lowPoint = await getAbsLow3dBPointForSpk(i, 20, 150, true);  // for NART=true
           const highPoint = await getAbsHigh3dBPointForSpk(i, 20, 150);
 
           if (highPoint >= 100) { // Can reach at least 100Hz
@@ -4803,8 +5046,9 @@
         let bestImprovement = 0;
 
         for (const speaker of bassCapableSpeakers) {
-          // Skip if speaker can't reach this band
-          if (speaker.highExtension < startFreq || speaker.lowExtension > endFreq) {
+          // ✓ Skip ONLY if speaker's range doesn't overlap the band at all
+          if (speaker.highExtension < startFreq) {
+            // Speaker's highest frequency is below the band - truly can't contribute
             continue;
           }
 
@@ -4818,6 +5062,21 @@
             { phase: 180, delay: 0, invert: true },
             { phase: 270, delay: 0.75 * (1000 / ((startFreq + endFreq) / 2)), invert: false }
           ];
+
+          /*
+          const phaseTests = [];
+          const centerFreq = (startFreq + endFreq) / 2;
+          const wavelengthMs = 1000 / centerFreq;
+
+          // Test delays in 1ms increments from -10ms to +10ms
+          for (let delayMs = -10; delayMs <= 10; delayMs += 1) {
+            phaseTests.push({
+              phase: (delayMs / wavelengthMs) * 360,
+              delay: delayMs,
+              invert: false
+            });
+          }
+          */
 
           for (const test of phaseTests) {
             // Simulate combined response
@@ -4918,11 +5177,16 @@
           console.log(`├─ Strategy: ${band.strategy}`);
           console.log(`├─ Goal: ${band.description}`);
 
-          // ✅ FIX: Use raw averaged measurements (Co, FLo, etc.) instead of equalized
+          // Find the averaged measurements (created in groundWorks)
           let speakerIndices = [];
+          const measurements = await fetch_mREW();
           for (let i = 1; i <= nSpeakers; i++) {
-            speakerIndices.push(i);
+            const title = measurements[i]?.title;
+            if (title && title.endsWith('o')) {  // Averaged measurements end with 'o'
+              speakerIndices.push(i);
+            }
           }
+          console.warn(`[DEBUG] >> ├─ Found ${speakerIndices.length} averaged speaker measurements`);
 
           if (speakerIndices.length === 0) {
             console.warn("No speaker measurements found - skipping band");
@@ -5230,12 +5494,23 @@
         }
       }
 
+      // ───────────────────────────────────────────────────────────────────────────
+      // Convert directional bass AFTER ART optimization
+      // ───────────────────────────────────────────────────────────────────────────
       async function convertDirectionalIfNeeded() {
-        if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
-          console.log("");
-          console.log("⚡ Converting directional bass to standard after NART optimization...");
-          await directional2standard();
+        if (!window.hasDirectionalBass || window.preCombinedSubCount <= 1) {
+          console.info("✓ No directional bass conversion needed");
+          return;
         }
+        console.log("\n⚡ CONVERTING DIRECTIONAL BASS TO STANDARD (Post-Optimization)");
+        console.log("═".repeat(60));
+        console.warn("Converting optimized directional subs to combined standard bass...");
+
+        window.nartOptimizationComplete = true;
+        await directional2standard();
+
+        console.warn("✓ Directional to standard conversion completed");
+        console.log("═".repeat(60));
       }
 
       async function drawResults() {
@@ -5958,10 +6233,10 @@
         console.log(`CommandID entries: ${validCommands.length}`);
         for (let i = 1; i <= nSpeakers + nSubs; i++) {
           if (!commandId[i]) {
-            console.error(`❌ Missing commandId[${i}]`);
+            console.error(`X Missing commandId[${i}]`);
             return false;
           }
-          console.log(`✅ commandId[${i}] = ${commandId[i]}`);
+          console.log(`✓ commandId[${i}] = ${commandId[i]}`);
         }
         return true;
       }
@@ -7287,7 +7562,7 @@
             const splDifferences = this.calculateEnhancedSPLDifferences(systemData);
             const roomEstimate = this.estimateEnhancedRoomSize(systemData);
             if (!systemAnalysis) {
-              console.error("❌ Cannot analyze system - insufficient data");
+              console.error("X Cannot analyze system - insufficient data");
               this.logValidationErrors();
               return { error: "System analysis failed", validationErrors: this.validationErrors };
             }
@@ -7488,10 +7763,10 @@
             }
             console.log(`\n📊 DETAILED PARAMETER BREAKDOWN:`);
             Object.entries(results).forEach(([paramId, result]) => {
-              const status = result.error ? "❌" :
-                result.level >= 3 ? "✅" :
+              const status = result.error ? "X" :
+                result.level >= 3 ? "✓" :
                   result.level >= 2 ? "⚠️" :
-                    result.level >= 1 ? "🔶" : "❌";
+                    result.level >= 1 ? "🔶" : "X";
               console.log(`${status} P${paramId.padStart(2, '0')}: ${result.parameterName}`);
               if (result.error) {
                 console.log(`    └─ Error: ${result.error}`);
@@ -7530,7 +7805,7 @@
               version: "2.1-Enhanced-Acoustics"
             };
           } catch (error) {
-            console.error("❌ Assessment failed:", error.message);
+            console.error("X Assessment failed:", error.message);
             console.log("═".repeat(75));
             return {
               error: `Assessment failed: ${error.message}`,

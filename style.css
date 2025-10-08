@@ -1,4 +1,4 @@
-/* ClariQ Next 0.0.13 - 08-10-2025 @ 00:50 */
+/* ClariQ Next 0.0.14 - 08-10-2025 @ 13:44 */
 :root {
 	--primary-color: #2563eb;
 	--secondary-color: #3b82f6;
@@ -577,17 +577,25 @@ ul li {
 	font-size: 0.74vw;
 }
 
-/* CUSTOM FILTERS */
+/* CUSTOM FILTERS (theme-adaptive, dark-aware) */
 .filter-row {
-	background: #f8f9fa;
-	border: 1px solid #dee2e6;
+	background: color-mix(in srgb, var(--card-background) 90%, var(--background-color) 10%);
+	border: 1px solid var(--border-color);
 	border-radius: 8px;
 	padding: 12px;
 	margin-bottom: 10px;
-	transition: all 0.2s;
+	transition: background-color 0.2s ease, box-shadow 0.2s ease;
+	color: var(--text-color);
 }
 
-.filter-row:hover {
+/* subtle highlight on hover (slightly brighter in dark mode) */
+[data-theme="dark"] .filter-row:hover {
+	background: color-mix(in srgb, var(--card-background) 70%, white 10%);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] .filter-row:hover {
+	background: color-mix(in srgb, var(--card-background) 85%, black 5%);
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -595,17 +603,31 @@ ul li {
 	font-size: 0.85rem;
 	font-weight: 600;
 	margin-bottom: 4px;
-	color: #495057;
+	color: var(--text-color);
+	opacity: 0.9;
 }
 
 .filter-row .form-control,
 .filter-row .form-select {
 	font-size: 0.9rem;
 	padding: 6px 10px;
+	background: var(--card-background);
+	border: 1px solid var(--border-color);
+	color: var(--text-color);
+	transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
+.filter-row .form-control:focus,
+.filter-row .form-select:focus {
+	border-color: var(--primary-color);
+	box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15);
+	background: color-mix(in srgb, var(--card-background) 85%, var(--primary-color) 5%);
+	color: var(--text-color);
+}
+
+/* filter number badge */
 .filter-number {
-	background: #007bff;
+	background: var(--primary-color);
 	color: white;
 	border-radius: 50%;
 	width: 28px;
@@ -615,4 +637,12 @@ ul li {
 	justify-content: center;
 	font-weight: bold;
 	font-size: 0.85rem;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.card {
+	background: var(--card-background);
+	color: var(--text-color);
+	border: 1px solid var(--border-color);
+	transition: background-color 0.3s ease, color 0.3s ease;
 }
