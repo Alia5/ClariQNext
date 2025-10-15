@@ -1,5 +1,5 @@
 <!-- 
-  Copyright (c) [Jun 2024] [OCA - https://www.youtube.com/@OCAudiophile]
+  Copyright (c) [2024-2025] [Nvexx]
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -9,6 +9,12 @@
 
   The above copyright notice and this permission notice shall be included in all
   copies or substantial portions of the Software.
+
+  PROPRIETARY COMPONENTS:
+  The NART Technology, SBIR detection and Advanced filter systems contained within this 
+  Software are PROPRIETARY and may NOT be copied, extracted, reproduced, 
+  modified, or used outside of this original project without explicit written 
+  permission from the copyright holder.
 
   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
