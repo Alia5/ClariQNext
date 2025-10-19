@@ -1,5 +1,5 @@
-// ClariQ Next 0.0.14 - 08-10-2025 @ 13:44
-// Cross-browser compatibility fixes (keeping original structure)
+// ClariQ Next 0.1.0 - 19-10-2025 @ 17:24
+// Cross-browser compatibility fixes
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
 	const userAgent = navigator.userAgent || "";
@@ -9,9 +9,7 @@ function checkBrowserCompatibility() {
 
 	return { isSafari, isIE, isTor };
 }
-
 const compat = checkBrowserCompatibility();
-
 // Safari/cross-browser compatibility namespace (minimal)
 window.AppCalibration = window.AppCalibration || {};
 
@@ -19,7 +17,7 @@ window.AppCalibration = window.AppCalibration || {};
 function disableUserSelection() {
 	const body = document.body;
 	body.style.userSelect = "none";
-	body.style.webkitUserSelect = "none"; // Safari
+	// body.style.webkitUserSelect = "none"; // Safari
 	body.style.mozUserSelect = "none"; // Firefox
 	body.style.msUserSelect = "none"; // IE
 }
@@ -27,7 +25,7 @@ function disableUserSelection() {
 function enableUserSelection() {
 	const body = document.body;
 	body.style.userSelect = "";
-	body.style.webkitUserSelect = "";
+	// body.style.webkitUserSelect = "";
 	body.style.mozUserSelect = "";
 	body.style.msUserSelect = "";
 }
@@ -76,14 +74,39 @@ window.AppCalibration.cleanup = {
 	},
 };
 
-// Global slider variables - Updated to support multiple sliders
+// ============================================================================
+// GLOBAL SLIDER VARIABLES - Updated to support ALL channel sliders
+// ============================================================================
 let sliderInstances = {
+	// Legacy layer sliders (kept for backward compatibility but functionality moved to individual channels)
 	bed: null,
 	height: null,
+	// Single channels
+	center: null,
+	height_ch: null,
+	surround_sb: null,
+	top_ts: null,
+	// Paired channels - Bed layer
+	main_fl_fr: null,
+	main_fwl_fwr: null,
+	surround_sla_sra: null,
+	surround_sbl_sbr: null,
+	// Paired channels - Height layer
+	height_fhl_fhr: null,
+	height_shl_shr: null,
+	height_rhl_rhr: null,
+	// Top channels
+	top_tfl_tfr: null,
+	top_tml_tmr: null,
+	top_trl_trr: null,
+	// Dolby enabled channels
+	dolby_fdl_fdr: null,
+	dolby_sdl_sdr: null,
+	dolby_bdl_bdr: null,
+	// Add phase weight slider
+	phase_weight: null,
 };
 window.AppCalibration.sliderInstances = sliderInstances;
-
-// Dark mode initialization will use existing global isDarkMode variable
 
 // Cross-browser emoji handling
 function getEmoji(lightModeEmoji, darkModeEmoji) {
@@ -137,9 +160,6 @@ document.addEventListener("DOMContentLoaded", function () {
 		window.AppCalibration.cleanup.addEventListener(themeToggle, "click", toggleTheme);
 	}
 });
-
-// Global variable for dyslexic font state (add this with your other globals)
-// let isDyslexicMode = false;
 
 // Dyslexic Font Toggle Functionality
 function toggleDyslexicFont() {
@@ -258,42 +278,120 @@ document.addEventListener("DOMContentLoaded", function () {
 	});
 
 	// 2. SLIDER CONTAINER VISIBILITY FIX
+	// ============================================================================
+	// SLIDER CONTAINER VISIBILITY - COMPLETE FIX
+	// ============================================================================
 	function toggleSliderVisibility(show) {
-		const bedSliderContainer = document.querySelector(".slider-container.bed-layer");
-		const heightSliderContainer = document.querySelector(".slider-container.height-layer");
+		console.log(`🎛️ toggleSliderVisibility called with show=${show}`);
 
-		// Always handle BED layer slider
-		if (bedSliderContainer) {
-			if (show) {
-				bedSliderContainer.style.display = "block";
-				// Add debugging to ensure container is visible
-				console.log("BED layer slider container shown - display:", bedSliderContainer.style.display);
-				console.log("BED layer container dimensions:", bedSliderContainer.offsetWidth, "x", bedSliderContainer.offsetHeight);
-			} else {
-				bedSliderContainer.style.display = "none";
-				console.log("BED layer slider container hidden");
+		// Define all container selectors
+		const allContainers = {
+			// Layer containers (legacy - keep for backward compatibility)
+			// bed: ".slider-container.bed-layer",
+			// height: ".slider-container.height-layer",
+			// Individual channel containers
+			center: ".slider-container.center-channel",
+			height_ch: ".slider-container.height-ch-channel",
+			surround_sb: ".slider-container.surround-sb-channel",
+			top_ts: ".slider-container.top-ts-channel",
+			main_fl_fr: ".slider-container.main-fl-fr-channel",
+			main_fwl_fwr: ".slider-container.main-fwl-fwr-channel",
+			surround_sla_sra: ".slider-container.surround-sla-sra-channel",
+			surround_sbl_sbr: ".slider-container.surround-sbl-sbr-channel",
+			height_fhl_fhr: ".slider-container.height-fhl-fhr-channel",
+			height_shl_shr: ".slider-container.height-shl-shr-channel",
+			height_rhl_rhr: ".slider-container.height-rhl-rhr-channel",
+			top_tfl_tfr: ".slider-container.top-tfl-tfr-channel",
+			top_tml_tmr: ".slider-container.top-tml-tmr-channel",
+			top_trl_trr: ".slider-container.top-trl-trr-channel",
+			dolby_fdl_fdr: ".slider-container.dolby-fdl-fdr-channel",
+			dolby_sdl_sdr: ".slider-container.dolby-sdl-sdr-channel",
+			dolby_bdl_bdr: ".slider-container.dolby-bdl-bdr-channel",
+			// Add phase weight
+			phase_weight: ".slider-container.phase-weight-slider",
+		};
+
+		// FORCE HIDE bed/height layer containers (if they exist)
+		const legacyContainers = [".slider-container.bed-layer", ".slider-container.height-layer"];
+
+		legacyContainers.forEach((selector) => {
+			const container = document.querySelector(selector);
+			if (container) {
+				container.style.display = "none";
+				console.log(`   🚫 HIDDEN legacy layer: ${selector}`);
 			}
-		} else {
-			console.error("❌ BED layer slider container (.slider-container.bed-layer) not found in DOM!");
+		});
+
+		// Check which containers exist in DOM
+		console.log("   🔍 Checking DOM containers:");
+		for (const [key, selector] of Object.entries(allContainers)) {
+			const container = document.querySelector(selector);
+			if (container) {
+				console.log(`   ✅ ${key}: EXISTS`);
+			} else {
+				console.log(`   ❌ ${key}: NOT FOUND`);
+			}
 		}
 
-		// Only show HEIGHT layer slider if hasHeightChannel is true
-		if (heightSliderContainer) {
-			const showHeightSlider = show && typeof hasHeightChannel !== "undefined" && hasHeightChannel === true;
+		// Get channel flags
+		const hasHeights = typeof hasHeightChannel !== "undefined" && hasHeightChannel === true;
+		const hasCenter = typeof hasCenterChannel !== "undefined" && hasCenterChannel === true;
+		const hasCenterHeight = typeof hasCenterHeightChannel !== "undefined" && hasCenterHeightChannel === true;
+		const hasFLFR = typeof hasFrontLeftFrontRightChannel !== "undefined" && hasFrontLeftFrontRightChannel === true;
+		const hasFWLFWR = typeof hasFrontWideLeftFrontWideRightChannel !== "undefined" && hasFrontWideLeftFrontWideRightChannel === true;
+		const hasSLASRA = typeof hasSurroundLeftSurroudRightChannel !== "undefined" && hasSurroundLeftSurroudRightChannel === true;
+		const hasSBLSBR = typeof hasSurroundBackLeftSurroundBackRightChannel !== "undefined" && hasSurroundBackLeftSurroundBackRightChannel === true;
+		const hasSB = typeof hasSurroundBackSingleChannel !== "undefined" && hasSurroundBackSingleChannel === true;
+		const hasFHLFHR = typeof hasFrontHeightLeftFrontHeightRightChannel !== "undefined" && hasFrontHeightLeftFrontHeightRightChannel === true;
+		const hasSHLSHR = typeof hasSurroundHeightLeftSurroudHeightRightChannel !== "undefined" && hasSurroundHeightLeftSurroudHeightRightChannel === true;
+		const hasRHLRHR = typeof hasRearHeightLeftRearHeightRightChannel !== "undefined" && hasRearHeightLeftRearHeightRightChannel === true;
+		const hasTFLTFR = typeof hasTopFrontLeftTopFrontRightChannel !== "undefined" && hasTopFrontLeftTopFrontRightChannel === true;
+		const hasTMLTMR = typeof hasTopMiddleLeftTopMiddleRightChannel !== "undefined" && hasTopMiddleLeftTopMiddleRightChannel === true;
+		const hasTRLTRR = typeof hasTopRearLeftTopRearRightChannel !== "undefined" && hasTopRearLeftTopRearRightChannel === true;
+		const hasTS = typeof hasTopSurroundChannel !== "undefined" && hasTopSurroundChannel === true;
+		const hasFDLFDR = typeof hasFrontDolbyLeftFrontDolbyRightChannel !== "undefined" && hasFrontDolbyLeftFrontDolbyRightChannel === true;
+		const hasSDLSDR = typeof hasSurroundDolbyLeftSurroundDolbyRightChannel !== "undefined" && hasSurroundDolbyLeftSurroundDolbyRightChannel === true;
+		const hasBDLBDR = typeof hasBackDolbyLeftBackDolbyRightChannel !== "undefined" && hasBackDolbyLeftBackDolbyRightChannel === true;
 
-			if (showHeightSlider) {
-				heightSliderContainer.style.display = "block";
-				console.log("HEIGHT layer slider container shown");
-			} else {
-				heightSliderContainer.style.display = "none";
-				if (show && (typeof hasHeightChannel === "undefined" || hasHeightChannel === false)) {
-					console.log("HEIGHT layer slider container hidden - no height channels");
-				} else {
-					console.log("HEIGHT layer slider container hidden");
-				}
+		// Define visibility rules for each container
+		const visibilityRules = {
+			// Legacy layers - always show if toggled
+			// bed: show,
+			// height: show && hasHeights,
+			// Bed layer channels
+			center: show && hasCenter,
+			main_fl_fr: show && hasFLFR,
+			main_fwl_fwr: show && hasFWLFWR,
+			surround_sla_sra: show && hasSLASRA,
+			surround_sbl_sbr: show && hasSBLSBR,
+			surround_sb: show && hasSB,
+			// Height layer channels
+			height_ch: show && hasHeights && hasCenterHeight,
+			height_fhl_fhr: show && hasHeights && hasFHLFHR,
+			height_shl_shr: show && hasHeights && hasSHLSHR,
+			height_rhl_rhr: show && hasHeights && hasRHLRHR,
+			// Top channels
+			top_tfl_tfr: show && hasHeights && hasTFLTFR,
+			top_tml_tmr: show && hasHeights && hasTMLTMR,
+			top_trl_trr: show && hasHeights && hasTRLTRR,
+			top_ts: show && hasHeights && hasTS,
+			// Dolby channels
+			dolby_fdl_fdr: show && hasHeights && hasFDLFDR,
+			dolby_sdl_sdr: show && hasHeights && hasSDLSDR,
+			dolby_bdl_bdr: show && hasHeights && hasBDLBDR,
+			phase_weight: show,
+		};
+
+		// Apply visibility to all containers
+		console.log("   🎨 Applying visibility:");
+		for (const [key, selector] of Object.entries(allContainers)) {
+			const container = document.querySelector(selector);
+			const shouldShow = visibilityRules[key];
+
+			if (container) {
+				container.style.display = shouldShow ? "block" : "none";
+				console.log(`   ${shouldShow ? "✅" : "⬜"} ${key}: ${shouldShow ? "SHOWN" : "HIDDEN"}`);
 			}
-		} else if (typeof hasHeightChannel !== "undefined" && hasHeightChannel === true) {
-			console.error("❌ HEIGHT layer slider container (.slider-container.height-layer) not found in DOM but hasHeightChannel=true!");
 		}
 	}
 
@@ -402,91 +500,480 @@ document.addEventListener("DOMContentLoaded", function () {
 		return typeof isClearCurve !== "undefined" && isClearCurve ? (typeof mergefreqIndex !== "undefined" ? mergefreqIndex : freqIndex) : freqIndex;
 	}
 
-	// 3. ENHANCED SLIDER INITIALIZATION WITH BETTER ERROR HANDLING
+	// ============================================================================
+	// PHASE WEIGHT SLIDER CLASS
+	// ============================================================================
+	class PhaseWeightSlider {
+		constructor(container) {
+			this.container = container;
+			this.config = {
+				min: 0,
+				max: 100,
+				step: 1,
+				defaultValue: 50,
+			};
+
+			this.track = container.querySelector(".slider-track");
+			this.range = container.querySelector("#sliderRange-phaseWeight");
+			this.handle = container.querySelector("#handle-phaseWeight");
+			this.ticksContainer = container.querySelector("#sliderTicks-phaseWeight");
+			this.valueDisplay = container.querySelector("#phaseWeightValue");
+			this.numericDisplay = container.querySelector("#phaseWeightNumeric");
+
+			this.isDragging = false;
+			this.currentValue = this.config.defaultValue;
+
+			this.init();
+		}
+
+		init() {
+			this.createTicks();
+			this.bindEvents();
+			this.updateDisplay(this.currentValue);
+			console.log("✅ Phase weight slider initialized at 50%");
+		}
+
+		createTicks() {
+			this.ticksContainer.innerHTML = "";
+			const ticks = [0, 25, 50, 75, 100];
+			ticks.forEach((tick) => {
+				const tickMark = document.createElement("div");
+				tickMark.className = "tick";
+				// tickMark.style.left = `${tick}%`;
+
+				const tickLabel = document.createElement("div");
+				tickLabel.className = "tick-label";
+				tickLabel.textContent = `${tick}%`;
+				tickMark.appendChild(tickLabel);
+
+				this.ticksContainer.appendChild(tickMark);
+			});
+		}
+
+		bindEvents() {
+			// Use the cleanup system
+			window.AppCalibration.cleanup.addEventListener(this.handle, "mousedown", (e) => this.startDrag(e));
+
+			window.AppCalibration.cleanup.addEventListener(document, "mousemove", (e) => this.onDrag(e));
+
+			window.AppCalibration.cleanup.addEventListener(document, "mouseup", () => this.endDrag());
+
+			window.AppCalibration.cleanup.addEventListener(this.track, "click", (e) => this.onTrackClick(e));
+
+			// Touch events
+			window.AppCalibration.cleanup.addEventListener(this.handle, "touchstart", (e) => this.startDrag(e), { passive: false });
+
+			window.AppCalibration.cleanup.addEventListener(document, "touchmove", (e) => this.onDrag(e), { passive: false });
+
+			window.AppCalibration.cleanup.addEventListener(document, "touchend", () => this.endDrag());
+		}
+
+		startDrag(e) {
+			e.preventDefault();
+			this.isDragging = true;
+			this.handle.classList.add("active");
+			disableUserSelection();
+		}
+
+		onDrag(e) {
+			if (!this.isDragging) return;
+			e.preventDefault();
+
+			const clientX = e.type.includes("touch") ? e.touches[0].clientX : e.clientX;
+			this.currentValue = this.getValueFromPosition(clientX);
+			this.updateDisplay(this.currentValue);
+		}
+
+		endDrag() {
+			if (this.isDragging) {
+				this.isDragging = false;
+				this.handle.classList.remove("active");
+				enableUserSelection();
+				console.log(`🎚️ Phase weight updated to: ${window.phaseWeight.toFixed(2)}`);
+			}
+		}
+
+		onTrackClick(e) {
+			if (e.target === this.handle || this.isDragging) return;
+
+			this.currentValue = this.getValueFromPosition(e.clientX);
+			this.updateDisplay(this.currentValue);
+		}
+
+		getValueFromPosition(clientX) {
+			const rect = this.track.getBoundingClientRect();
+			const percent = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+			return Math.round(percent);
+		}
+
+		updateDisplay(value) {
+			const percent = value;
+			const normalized = value / 100; // Convert to 0.0-1.0
+
+			this.valueDisplay.textContent = `${percent}%`;
+			this.numericDisplay.textContent = normalized.toFixed(2);
+
+			// Update global variable
+			window.phaseWeight = normalized;
+
+			// Update slider visuals
+			this.handle.style.left = `calc(${percent}% - 12px)`;
+			this.range.style.width = `${percent}%`;
+		}
+
+		getSelectedRange() {
+			return {
+				value: this.currentValue,
+				normalized: this.currentValue / 100,
+				mode: "single",
+				type: "phase_weight",
+			};
+		}
+
+		reset() {
+			this.currentValue = this.config.defaultValue;
+			this.updateDisplay(this.currentValue);
+		}
+	}
+
+	// 3. ENHANCED SLIDER INITIALIZATION WITH ALL CHANNELS
+	// ============================================================================
+	// INITIALIZE SLIDERS - COMPLETE FIX
+	// ============================================================================
 	function initializeSliders() {
-		// Check if we have height channels
 		const hasHeights = typeof hasHeightChannel !== "undefined" && hasHeightChannel === true;
+		// Define all channel presence variables with proper checks
+		const hasCenter = typeof hasCenterChannel !== "undefined" && hasCenterChannel === true;
+		const hasCenterHeight = typeof hasCenterHeightChannel !== "undefined" && hasCenterHeightChannel === true;
+		const hasFLFR = typeof hasFrontLeftFrontRightChannel !== "undefined" && hasFrontLeftFrontRightChannel === true;
+		const hasFWLFWR = typeof hasFrontWideLeftFrontWideRightChannel !== "undefined" && hasFrontWideLeftFrontWideRightChannel === true;
+		const hasSLASRA = typeof hasSurroundLeftSurroudRightChannel !== "undefined" && hasSurroundLeftSurroudRightChannel === true;
+		const hasSBLSBR = typeof hasSurroundBackLeftSurroundBackRightChannel !== "undefined" && hasSurroundBackLeftSurroundBackRightChannel === true;
+		const hasSB = typeof hasSurroundBackSingleChannel !== "undefined" && hasSurroundBackSingleChannel === true;
+		const hasFHLFHR = typeof hasFrontHeightLeftFrontHeightRightChannel !== "undefined" && hasFrontHeightLeftFrontHeightRightChannel === true;
+		const hasSHLSHR = typeof hasSurroundHeightLeftSurroudHeightRightChannel !== "undefined" && hasSurroundHeightLeftSurroudHeightRightChannel === true;
+		const hasRHLRHR = typeof hasRearHeightLeftRearHeightRightChannel !== "undefined" && hasRearHeightLeftRearHeightRightChannel === true;
+		const hasTFLTFR = typeof hasTopFrontLeftTopFrontRightChannel !== "undefined" && hasTopFrontLeftTopFrontRightChannel === true;
+		const hasTMLTMR = typeof hasTopMiddleLeftTopMiddleRightChannel !== "undefined" && hasTopMiddleLeftTopMiddleRightChannel === true;
+		const hasTRLTRR = typeof hasTopRearLeftTopRearRightChannel !== "undefined" && hasTopRearLeftTopRearRightChannel === true;
+		const hasTS = typeof hasTopSurroundChannel !== "undefined" && hasTopSurroundChannel === true;
+		const hasFDLFDR = typeof hasFrontDolbyLeftFrontDolbyRightChannel !== "undefined" && hasFrontDolbyLeftFrontDolbyRightChannel === true;
+		const hasSDLSDR = typeof hasSurroundDolbyLeftSurroundDolbyRightChannel !== "undefined" && hasSurroundDolbyLeftSurroundDolbyRightChannel === true;
+		const hasBDLBDR = typeof hasBackDolbyLeftBackDolbyRightChannel !== "undefined" && hasBackDolbyLeftBackDolbyRightChannel === true;
 
 		// Get filtered frequencies for each layer
 		const bedFilteredFreqs = getFilteredFrequencies("bed");
 		const heightFilteredFreqs = hasHeights ? getFilteredFrequencies("height") : [];
 
-		console.log("🔧 Initializing sliders...");
+		console.log("🔧 Initializing all channel sliders...");
 		console.log("   - ClearCurve mode:", typeof isClearCurve !== "undefined" ? isClearCurve : "undefined");
 		console.log("   - BED frequencies:", bedFilteredFreqs.length);
 		console.log("   - HEIGHT frequencies:", heightFilteredFreqs.length);
 		console.log("   - Has heights:", hasHeights);
+		console.log("   📊 Channel presence flags:");
+		console.log("      • Center:", hasCenter);
+		console.log("      • Center Height:", hasCenterHeight);
+		console.log("      • Front L/R:", hasFLFR);
+		console.log("      • Front Wide L/R:", hasFWLFWR);
+		console.log("      • Surround L/R:", hasSLASRA);
+		console.log("      • Surround Back L/R:", hasSBLSBR);
+		console.log("      • Surround Back (single):", hasSB);
+		console.log("      • Front Height L/R:", hasFHLFHR);
+		console.log("      • Surround Height L/R:", hasSHLSHR);
+		console.log("      • Rear Height L/R:", hasRHLRHR);
+		console.log("      • Top Front L/R:", hasTFLTFR);
+		console.log("      • Top Middle L/R:", hasTMLTMR);
+		console.log("      • Top Rear L/R:", hasTRLTRR);
+		console.log("      • Top Surround:", hasTS);
+		console.log("      • Front Dolby L/R:", hasFDLFDR);
+		console.log("      • Surround Dolby L/R:", hasSDLSDR);
+		console.log("      • Back Dolby L/R:", hasBDLBDR);
 
 		if (bedFilteredFreqs.length > 0 || heightFilteredFreqs.length > 0) {
 			const useSingleMode = typeof isClearCurve !== "undefined" && isClearCurve;
 			console.log("   - Single mode:", useSingleMode);
 
-			// Always initialize BED layer slider
+			// 🚫 DO NOT initialize bed/height layer sliders - they are removed
+			console.log("   🚫 Skipping bed/height layer sliders (removed)");
+
+			/*
+			// Initialize BED layer slider (legacy - for backward compatibility)
 			const bedSliderContainer = document.querySelector(".slider-container.bed-layer");
-			if (bedSliderContainer) {
-				console.log("✅ Found BED slider container");
-
-				if (!sliderInstances.bed && bedFilteredFreqs.length > 0) {
-					console.log(`Initializing BED layer slider with ${bedFilteredFreqs.length} frequencies...`);
-
-					try {
-						sliderInstances.bed = new RangeSlider(bedSliderContainer, bedFilteredFreqs, useSingleMode, "bed");
-						window.AppCalibration.sliderInstances.bed = sliderInstances.bed;
-						console.log("✅ BED layer slider initialized successfully");
-					} catch (error) {
-						console.error("❌ Failed to initialize BED slider:", error);
-					}
-				} else if (sliderInstances.bed) {
-					console.log("BED slider already exists");
-				} else {
-					console.warn("No BED frequencies available");
+			if (bedSliderContainer && !sliderInstances.bed && bedFilteredFreqs.length > 0) {
+				console.log(`Initializing BED layer slider (legacy) with ${bedFilteredFreqs.length} frequencies...`);
+				try {
+					sliderInstances.bed = new RangeSlider(bedSliderContainer, bedFilteredFreqs, useSingleMode, "bed");
+					window.AppCalibration.sliderInstances.bed = sliderInstances.bed;
+					console.log("✅ BED layer slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize BED slider:", error);
 				}
-			} else {
-				console.error("❌ BED slider container (.slider-container.bed-layer) not found!");
-				// Log all available containers for debugging
-				const allContainers = document.querySelectorAll(".slider-container");
-				console.log(
-					"Available slider containers:",
-					Array.from(allContainers).map((c) => c.className),
-				);
 			}
 
-			// Only initialize HEIGHT layer slider if hasHeightChannel is true
+			// Initialize HEIGHT layer slider (legacy - for backward compatibility)
 			const heightSliderContainer = document.querySelector(".slider-container.height-layer");
 			if (heightSliderContainer && !sliderInstances.height && heightFilteredFreqs.length > 0 && hasHeights) {
-				console.log(`Initializing HEIGHT layer slider with ${heightFilteredFreqs.length} frequencies...`);
-
+				console.log(`Initializing HEIGHT layer slider (legacy) with ${heightFilteredFreqs.length} frequencies...`);
 				try {
 					sliderInstances.height = new RangeSlider(heightSliderContainer, heightFilteredFreqs, useSingleMode, "height");
 					window.AppCalibration.sliderInstances.height = sliderInstances.height;
-					console.log("✅ HEIGHT layer slider initialized successfully");
+					console.log("✅ HEIGHT layer slider initialized");
 				} catch (error) {
 					console.error("❌ Failed to initialize HEIGHT slider:", error);
 				}
-			} else if (!hasHeights) {
-				console.log("Skipping HEIGHT layer slider - hasHeightChannel = false");
+			}
+			*/
+
+			// Initialize CENTER channel slider
+			const centerContainer = document.querySelector(".slider-container.center-channel");
+			if (centerContainer && !sliderInstances.center && bedFilteredFreqs.length > 0 && hasCenter) {
+				console.log(`Initializing CENTER channel slider...`);
+				try {
+					sliderInstances.center = new RangeSlider(centerContainer, bedFilteredFreqs, useSingleMode, "center");
+					window.AppCalibration.sliderInstances.center = sliderInstances.center;
+					console.log("✅ CENTER channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize CENTER slider:", error);
+				}
 			}
 
-			// Set up monitoring for available sliders
-			let previousBedRange = sliderInstances.bed ? sliderInstances.bed.getSelectedRange() : null;
-			let previousHeightRange = sliderInstances.height ? sliderInstances.height.getSelectedRange() : null;
+			// Initialize HEIGHT_CH channel slider
+			const centerheightChContainer = document.querySelector(".slider-container.height-ch-channel");
+			if (centerheightChContainer && !sliderInstances.height_ch && heightFilteredFreqs.length > 0 && hasCenterHeight) {
+				console.log(`Initializing CENTER HEIGHT (AURO3D) channel slider...`);
+				try {
+					sliderInstances.height_ch = new RangeSlider(centerheightChContainer, heightFilteredFreqs, useSingleMode, "height_ch");
+					window.AppCalibration.sliderInstances.height_ch = sliderInstances.height_ch;
+					console.log("✅ CENTER HEIGHT (AURO3D) channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize CENTER HEIGHT slider:", error);
+				}
+			}
+
+			// Initialize MAIN_FL_FR paired channel slider
+			const mainFlFrContainer = document.querySelector(".slider-container.main-fl-fr-channel");
+			if (mainFlFrContainer && !sliderInstances.main_fl_fr && bedFilteredFreqs.length > 0 && hasFLFR) {
+				console.log(`Initializing FRONT LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.main_fl_fr = new RangeSlider(mainFlFrContainer, bedFilteredFreqs, useSingleMode, "main_fl_fr");
+					window.AppCalibration.sliderInstances.main_fl_fr = sliderInstances.main_fl_fr;
+					console.log("✅ FRONT LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize FRONT LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize MAIN_FWL_FWR paired channel slider
+			const mainFwlFwrContainer = document.querySelector(".slider-container.main-fwl-fwr-channel");
+			if (mainFwlFwrContainer && !sliderInstances.main_fwl_fwr && bedFilteredFreqs.length > 0 && hasFWLFWR) {
+				console.log(`Initializing FRONT WIDE LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.main_fwl_fwr = new RangeSlider(mainFwlFwrContainer, bedFilteredFreqs, useSingleMode, "main_fwl_fwr");
+					window.AppCalibration.sliderInstances.main_fwl_fwr = sliderInstances.main_fwl_fwr;
+					console.log("✅ FRONT WIDE LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize FRONT WIDE LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize SURROUND_SLA_SRA paired channel slider
+			const surroundSlaSraContainer = document.querySelector(".slider-container.surround-sla-sra-channel");
+			if (surroundSlaSraContainer && !sliderInstances.surround_sla_sra && bedFilteredFreqs.length > 0 && hasSLASRA) {
+				console.log(`Initializing SURROUND LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.surround_sla_sra = new RangeSlider(surroundSlaSraContainer, bedFilteredFreqs, useSingleMode, "surround_sla_sra");
+					window.AppCalibration.sliderInstances.surround_sla_sra = sliderInstances.surround_sla_sra;
+					console.log("✅ SURROUND LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize SURROUND LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize SURROUND_SBL_SBR paired channel slider
+			const surroundSblSbrContainer = document.querySelector(".slider-container.surround-sbl-sbr-channel");
+			if (surroundSblSbrContainer && !sliderInstances.surround_sbl_sbr && bedFilteredFreqs.length > 0 && hasSBLSBR) {
+				console.log(`Initializing SURROUND BACK LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.surround_sbl_sbr = new RangeSlider(surroundSblSbrContainer, bedFilteredFreqs, useSingleMode, "surround_sbl_sbr");
+					window.AppCalibration.sliderInstances.surround_sbl_sbr = sliderInstances.surround_sbl_sbr;
+					console.log("✅ SURROUND BACK LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize SURROUND BACK LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize SURROUND_SB single channel slider
+			const surroundSbContainer = document.querySelector(".slider-container.surround-sb-channel");
+			if (surroundSbContainer && !sliderInstances.surround_sb && bedFilteredFreqs.length > 0 && hasSB) {
+				console.log(`Initializing SURROUND BACK single channel slider...`);
+				try {
+					sliderInstances.surround_sb = new RangeSlider(surroundSbContainer, bedFilteredFreqs, useSingleMode, "surround_sb");
+					window.AppCalibration.sliderInstances.surround_sb = sliderInstances.surround_sb;
+					console.log("✅ SURROUND BACK single channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize SURROUND BACK slider:", error);
+				}
+			}
+
+			// Initialize HEIGHT_FHL_FHR paired channel slider
+			const heightFhlFhrContainer = document.querySelector(".slider-container.height-fhl-fhr-channel");
+			if (heightFhlFhrContainer && !sliderInstances.height_fhl_fhr && heightFilteredFreqs.length > 0 && hasFHLFHR) {
+				console.log(`Initializing FRONT HEIGHT LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.height_fhl_fhr = new RangeSlider(heightFhlFhrContainer, heightFilteredFreqs, useSingleMode, "height_fhl_fhr");
+					window.AppCalibration.sliderInstances.height_fhl_fhr = sliderInstances.height_fhl_fhr;
+					console.log("✅ FRONT HEIGHT LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize FRONT HEIGHT LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize HEIGHT_SHL_SHR paired channel slider
+			const heightShlShrContainer = document.querySelector(".slider-container.height-shl-shr-channel");
+			if (heightShlShrContainer && !sliderInstances.height_shl_shr && heightFilteredFreqs.length > 0 && hasSHLSHR) {
+				console.log(`Initializing SURROUND HEIGHT LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.height_shl_shr = new RangeSlider(heightShlShrContainer, heightFilteredFreqs, useSingleMode, "height_shl_shr");
+					window.AppCalibration.sliderInstances.height_shl_shr = sliderInstances.height_shl_shr;
+					console.log("✅ SURROUND HEIGHT LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize SURROUND HEIGHT LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize HEIGHT_RHL_RHR paired channel slider
+			const heightRhlRhrContainer = document.querySelector(".slider-container.height-rhl-rhr-channel");
+			if (heightRhlRhrContainer && !sliderInstances.height_rhl_rhr && heightFilteredFreqs.length > 0 && hasRHLRHR) {
+				console.log(`Initializing REAR HEIGHT LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.height_rhl_rhr = new RangeSlider(heightRhlRhrContainer, heightFilteredFreqs, useSingleMode, "height_rhl_rhr");
+					window.AppCalibration.sliderInstances.height_rhl_rhr = sliderInstances.height_rhl_rhr;
+					console.log("✅ REAR HEIGHT LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize REAR HEIGHT LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize TOP_TFL_TFR paired channel slider
+			const topTflTfrContainer = document.querySelector(".slider-container.top-tfl-tfr-channel");
+			if (topTflTfrContainer && !sliderInstances.top_tfl_tfr && heightFilteredFreqs.length > 0 && hasTFLTFR) {
+				console.log(`Initializing TOP FRONT LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.top_tfl_tfr = new RangeSlider(topTflTfrContainer, heightFilteredFreqs, useSingleMode, "top_tfl_tfr");
+					window.AppCalibration.sliderInstances.top_tfl_tfr = sliderInstances.top_tfl_tfr;
+					console.log("✅ TOP FRONT LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize TOP FRONT LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize TOP_TML_TMR paired channel slider
+			const topTmlTmrContainer = document.querySelector(".slider-container.top-tml-tmr-channel");
+			if (topTmlTmrContainer && !sliderInstances.top_tml_tmr && heightFilteredFreqs.length > 0 && hasTMLTMR) {
+				console.log(`Initializing TOP MIDDLE LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.top_tml_tmr = new RangeSlider(topTmlTmrContainer, heightFilteredFreqs, useSingleMode, "top_tml_tmr");
+					window.AppCalibration.sliderInstances.top_tml_tmr = sliderInstances.top_tml_tmr;
+					console.log("✅ TOP MIDDLE LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize TOP MIDDLE LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize TOP_TRL_TRR paired channel slider
+			const topTrlTrrContainer = document.querySelector(".slider-container.top-trl-trr-channel");
+			if (topTrlTrrContainer && !sliderInstances.top_trl_trr && heightFilteredFreqs.length > 0 && hasTRLTRR) {
+				console.log(`Initializing TOP REAR LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.top_trl_trr = new RangeSlider(topTrlTrrContainer, heightFilteredFreqs, useSingleMode, "top_trl_trr");
+					window.AppCalibration.sliderInstances.top_trl_trr = sliderInstances.top_trl_trr;
+					console.log("✅ TOP REAR LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize TOP REAR LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize TOP_TS single channel slider
+			const topTsContainer = document.querySelector(".slider-container.top-ts-channel");
+			if (topTsContainer && !sliderInstances.top_ts && heightFilteredFreqs.length > 0 && hasTS) {
+				console.log(`Initializing TOP SURROUND (AURO3D) single channel slider...`);
+				try {
+					sliderInstances.top_ts = new RangeSlider(topTsContainer, heightFilteredFreqs, useSingleMode, "top_ts");
+					window.AppCalibration.sliderInstances.top_ts = sliderInstances.top_ts;
+					console.log("✅ TOP SURROUND (AURO3D) single channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize TOP SURROUND slider:", error);
+				}
+			}
+
+			// Initialize DOLBY_FDL_FDR paired channel slider
+			const dolbyFdlFdrContainer = document.querySelector(".slider-container.dolby-fdl-fdr-channel");
+			if (dolbyFdlFdrContainer && !sliderInstances.dolby_fdl_fdr && heightFilteredFreqs.length > 0 && hasFDLFDR) {
+				console.log(`Initializing FRONT DOLBY LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.dolby_fdl_fdr = new RangeSlider(dolbyFdlFdrContainer, heightFilteredFreqs, useSingleMode, "dolby_fdl_fdr");
+					window.AppCalibration.sliderInstances.dolby_fdl_fdr = sliderInstances.dolby_fdl_fdr;
+					console.log("✅ FRONT DOLBY LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize FRONT DOLBY LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize DOLBY_SDL_SDR paired channel slider
+			const dolbySdlSdrContainer = document.querySelector(".slider-container.dolby-sdl-sdr-channel");
+			if (dolbySdlSdrContainer && !sliderInstances.dolby_sdl_sdr && heightFilteredFreqs.length > 0 && hasSDLSDR) {
+				console.log(`Initializing SURROUND DOLBY LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.dolby_sdl_sdr = new RangeSlider(dolbySdlSdrContainer, heightFilteredFreqs, useSingleMode, "dolby_sdl_sdr");
+					window.AppCalibration.sliderInstances.dolby_sdl_sdr = sliderInstances.dolby_sdl_sdr;
+					console.log("✅ SURROUND DOLBY LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize SURROUND DOLBY LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// Initialize DOLBY_BDL_BDR paired channel slider
+			const dolbyBdlBdrContainer = document.querySelector(".slider-container.dolby-bdl-bdr-channel");
+			if (dolbyBdlBdrContainer && !sliderInstances.dolby_bdl_bdr && heightFilteredFreqs.length > 0 && hasBDLBDR) {
+				console.log(`Initializing BACK DOLBY LEFT&RIGHT paired channel slider...`);
+				try {
+					sliderInstances.dolby_bdl_bdr = new RangeSlider(dolbyBdlBdrContainer, heightFilteredFreqs, useSingleMode, "dolby_bdl_bdr");
+					window.AppCalibration.sliderInstances.dolby_bdl_bdr = sliderInstances.dolby_bdl_bdr;
+					console.log("✅ BACK DOLBY LEFT&RIGHT paired channel slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize BACK DOLBY LEFT&RIGHT slider:", error);
+				}
+			}
+
+			// NEW: Initialize phase weight slider (always initialize, doesn't depend on frequencies)
+			const phaseWeightContainer = document.querySelector(".slider-container.phase-weight-slider");
+			if (phaseWeightContainer && !sliderInstances.phase_weight) {
+				console.log(`Initializing PHASE WEIGHT slider...`);
+				try {
+					sliderInstances.phase_weight = new PhaseWeightSlider(phaseWeightContainer);
+					window.AppCalibration.sliderInstances.phase_weight = sliderInstances.phase_weight;
+					console.log("✅ PHASE WEIGHT slider initialized");
+				} catch (error) {
+					console.error("❌ Failed to initialize PHASE WEIGHT slider:", error);
+				}
+			}
+
+			// Set up monitoring for all available sliders
+			const previousRanges = {};
+			for (const [key, slider] of Object.entries(sliderInstances)) {
+				if (slider) {
+					previousRanges[key] = slider.getSelectedRange();
+				}
+			}
 
 			const checkForChanges = () => {
-				// Check BED layer changes
-				if (sliderInstances.bed) {
-					const currentBedRange = sliderInstances.bed.getSelectedRange();
-					if (JSON.stringify(currentBedRange) !== JSON.stringify(previousBedRange)) {
-						previousBedRange = currentBedRange;
-						handleSliderChange("bed", currentBedRange);
-					}
-				}
+				for (const [key, slider] of Object.entries(sliderInstances)) {
+					if (!slider) continue;
 
-				// Check HEIGHT layer changes (only if height slider exists)
-				if (sliderInstances.height) {
-					const currentHeightRange = sliderInstances.height.getSelectedRange();
-					if (JSON.stringify(currentHeightRange) !== JSON.stringify(previousHeightRange)) {
-						previousHeightRange = currentHeightRange;
-						handleSliderChange("height", currentHeightRange);
+					const currentRange = slider.getSelectedRange();
+					if (JSON.stringify(currentRange) !== JSON.stringify(previousRanges[key])) {
+						previousRanges[key] = currentRange;
+						handleSliderChange(key, currentRange);
 					}
 				}
 			};
@@ -495,71 +982,145 @@ document.addEventListener("DOMContentLoaded", function () {
 			window.AppCalibration.cleanup.addInterval(intervalId);
 
 			if (useSingleMode) {
-				console.log("Single handle mode enabled for ClearCurve on available sliders");
+				console.log("✨ Single handle mode enabled for ClearCurve on all available sliders");
 			}
 
-			console.log(`Frequency distribution - BED: ${bedFilteredFreqs.length} freqs${hasHeights ? `, HEIGHT: ${heightFilteredFreqs.length} freqs` : " (HEIGHT: disabled)"}`);
+			// Log summary of initialized sliders
+			const initializedCount = Object.values(sliderInstances).filter((s) => s !== null).length;
+			console.log(`\n✅ SLIDER INITIALIZATION COMPLETE:`);
+			console.log(`   📊 Total sliders initialized: ${initializedCount} out of ${Object.keys(sliderInstances).length} possible`);
+			console.log(`   🎛️  Individual channel sliders active: ${initializedCount - 2}`); // -2 for legacy bed/height
 		} else {
-			console.warn("Cannot initialize sliders: no valid frequency data for any layer");
+			console.warn("❌ Cannot initialize sliders: no valid frequency data for any layer");
 		}
 	}
 
-	// Function to handle slider value changes
-	function handleSliderChange(layerType, currentRange) {
-		// console.log(`🎛️ ${layerType.toUpperCase()} layer slider changed:`, currentRange);
+	// Enhanced function to handle slider value changes for all channels
+	function handleSliderChange(channelKey, currentRange) {
 		const rangeText = currentRange.min === currentRange.max ? `${currentRange.min}Hz` : `${currentRange.min}Hz to ${currentRange.max}Hz`;
-		console.log(`🎛️ ${layerType.toUpperCase()} layer slider changed: ${rangeText}`);
+		console.log(`🎛️ ${channelKey.toUpperCase()} slider changed: ${rangeText}`);
 
 		if (currentRange.mode === "single") {
-			// Store the selected frequency for the specific layer
-			if (layerType === "bed") {
-				window.selectedFrequencyBed = currentRange.value;
-			} else if (layerType === "height") {
-				window.selectedFrequencyHeight = currentRange.value;
-			}
+			// Store the selected frequency for the specific channel
+			window[`selectedFrequency_${channelKey}`] = currentRange.value;
 
-			// ClearCurve mode updates for specific layer
+			// ClearCurve mode updates for specific channels
 			if (typeof isClearCurve !== "undefined" && isClearCurve) {
-				if (layerType === "bed") {
-					// Update BED layer frequencies
-					mergeFrequencyF = currentRange.value;
-					mergeFrequencyC = currentRange.value;
-					mergeFrequencySur = currentRange.value;
-					mergeFrequencySurB = currentRange.value;
-					mergeFrequencySurBS = currentRange.value;
-				} else if (layerType === "height") {
-					// Update HEIGHT layer frequencies
-					mergeFrequencyFW = currentRange.value;
-					mergeFrequencyFH = currentRange.value;
-					mergeFrequencySH = currentRange.value;
-					mergeFrequencyRH = currentRange.value;
-					mergeFrequencyTF = currentRange.value;
-					mergeFrequencyTM = currentRange.value;
-					mergeFrequencyTR = currentRange.value;
+				// Map channel keys to merge frequency variables
+				switch (channelKey) {
+					case "bed":
+						mergeFrequencyF = currentRange.value;
+						mergeFrequencyC = currentRange.value;
+						mergeFrequencySur = currentRange.value;
+						mergeFrequencySurB = currentRange.value;
+						mergeFrequencySurBS = currentRange.value;
+						break;
+					case "height":
+						mergeFrequencyFW = currentRange.value;
+						mergeFrequencyFH = currentRange.value;
+						mergeFrequencySH = currentRange.value;
+						mergeFrequencyRH = currentRange.value;
+						mergeFrequencyTF = currentRange.value;
+						mergeFrequencyTM = currentRange.value;
+						mergeFrequencyTR = currentRange.value;
+						break;
+					case "center":
+						mergeFrequencyC = currentRange.value;
+						break;
+					case "height_ch":
+						mergeFrequencyCH = currentRange.value;
+						break;
+					case "main_fl_fr":
+						mergeFrequencyFL = currentRange.value;
+						mergeFrequencyFR = currentRange.value;
+						break;
+					case "main_fwl_fwr":
+						mergeFrequencyFWL = currentRange.value;
+						mergeFrequencyFWR = currentRange.value;
+						break;
+					case "surround_sla_sra":
+						mergeFrequencySLA = currentRange.value;
+						mergeFrequencySRA = currentRange.value;
+						break;
+					case "surround_sbl_sbr":
+						mergeFrequencySBL = currentRange.value;
+						mergeFrequencySBR = currentRange.value;
+						break;
+					case "surround_sb":
+						mergeFrequencySB = currentRange.value;
+						break;
+					case "height_fhl_fhr":
+						mergeFrequencyFHL = currentRange.value;
+						mergeFrequencyFHR = currentRange.value;
+						break;
+					case "height_shl_shr":
+						mergeFrequencySHL = currentRange.value;
+						mergeFrequencySHR = currentRange.value;
+						break;
+					case "height_rhl_rhr":
+						mergeFrequencyRHL = currentRange.value;
+						mergeFrequencyRHR = currentRange.value;
+						break;
+					case "top_tfl_tfr":
+						mergeFrequencyTFL = currentRange.value;
+						mergeFrequencyTFR = currentRange.value;
+						break;
+					case "top_tml_tmr":
+						mergeFrequencyTML = currentRange.value;
+						mergeFrequencyTMR = currentRange.value;
+						break;
+					case "top_trl_trr":
+						mergeFrequencyTRL = currentRange.value;
+						mergeFrequencyTRR = currentRange.value;
+						break;
+					case "top_ts":
+						mergeFrequencyTS = currentRange.value;
+						break;
+					case "dolby_fdl_fdr":
+						mergeFrequencyFDL = currentRange.value;
+						mergeFrequencyFDR = currentRange.value;
+						break;
+					case "dolby_sdl_sdr":
+						mergeFrequencySDL = currentRange.value;
+						mergeFrequencySDR = currentRange.value;
+						break;
+					case "dolby_bdl_bdr":
+						mergeFrequencyBDL = currentRange.value;
+						mergeFrequencyBDR = currentRange.value;
+						break;
 				}
 			}
 		} else {
-			// Store the range for the specific layer
-			if (layerType === "bed") {
-				window.selectedMinFreqBed = currentRange.min;
-				window.selectedMaxFreqBed = currentRange.max;
-			} else if (layerType === "height") {
-				window.selectedMinFreqHeight = currentRange.min;
-				window.selectedMaxFreqHeight = currentRange.max;
-			}
+			// Store the range for the specific channel
+			window[`selectedMinFreq_${channelKey}`] = currentRange.min;
+			window[`selectedMaxFreq_${channelKey}`] = currentRange.max;
 		}
 	}
 
-	// Function to reset sliders - Updated for multiple sliders
+	// Function to reset all sliders
+	// ============================================================================
+	// RESET SLIDERS - COMPLETE FIX
+	// ============================================================================
 	function resetSliders() {
-		sliderInstances.bed = null;
-		sliderInstances.height = null;
+		console.log("🔥 Resetting ALL slider instances...");
+
+		// Reset all slider instances
+		for (const key in sliderInstances) {
+			if (sliderInstances[key]) {
+				console.log(`   🗑️  Clearing ${key}`);
+			}
+			sliderInstances[key] = null;
+		}
+
 		window.AppCalibration.sliderInstances = sliderInstances;
 		toggleSliderVisibility(false);
-		console.log("🔥 All sliders reset");
+		console.log("✅ All sliders reset and hidden");
 	}
 
-	// 4. FIX FOR MEASUREMENTS IMPORT CALLBACK
+	// 4. FIX FOR MEASUREMENTS IMPORT CALLBACK - Keep existing functionality
+	// ============================================================================
+	// MEASUREMENTS IMPORT CALLBACK - COMPLETE FIX
+	// ============================================================================
 	function onMeasurementsImported() {
 		measurementsImported = true;
 		window.measurementsImported = true;
@@ -567,26 +1128,49 @@ document.addEventListener("DOMContentLoaded", function () {
 		console.log("📊 Measurements imported - showing sliders");
 		toggleSliderVisibility(true);
 
-		// Add a longer delay and verify DOM state
+		// Add delay and verify DOM state for ALL containers
 		setTimeout(() => {
 			console.log("🔧 Attempting to initialize sliders...");
 
-			// Verify the containers exist before trying to initialize
-			const bedContainer = document.querySelector(".slider-container.bed-layer");
-			const heightContainer = document.querySelector(".slider-container.height-layer");
+			// Verify ALL containers exist
+			const allContainers = {
+				bed: ".slider-container.bed-layer",
+				height: ".slider-container.height-layer",
+				center: ".slider-container.center-channel",
+				height_ch: ".slider-container.height-ch-channel",
+				surround_sb: ".slider-container.surround-sb-channel",
+				top_ts: ".slider-container.top-ts-channel",
+				main_fl_fr: ".slider-container.main-fl-fr-channel",
+				main_fwl_fwr: ".slider-container.main-fwl-fwr-channel",
+				surround_sla_sra: ".slider-container.surround-sla-sra-channel",
+				surround_sbl_sbr: ".slider-container.surround-sbl-sbr-channel",
+				height_fhl_fhr: ".slider-container.height-fhl-fhr-channel",
+				height_shl_shr: ".slider-container.height-shl-shr-channel",
+				height_rhl_rhr: ".slider-container.height-rhl-rhr-channel",
+				top_tfl_tfr: ".slider-container.top-tfl-tfr-channel",
+				top_tml_tmr: ".slider-container.top-tml-tmr-channel",
+				top_trl_trr: ".slider-container.top-trl-trr-channel",
+				dolby_fdl_fdr: ".slider-container.dolby-fdl-fdr-channel",
+				dolby_sdl_sdr: ".slider-container.dolby-sdl-sdr-channel",
+				dolby_bdl_bdr: ".slider-container.dolby-bdl-bdr-channel",
+			};
 
-			console.log("DOM check - BED container:", !!bedContainer);
-			console.log("DOM check - HEIGHT container:", !!heightContainer);
-
-			if (bedContainer) {
-				console.log("BED container visible:", bedContainer.style.display !== "none");
+			console.log("DOM check - Container status:");
+			for (const [key, selector] of Object.entries(allContainers)) {
+				const el = document.querySelector(selector);
+				if (el) {
+					const isVisible = el.style.display !== "none";
+					console.log(`  ${isVisible ? "✅" : "⬜"} ${key}: EXISTS (display: ${el.style.display || "default"})`);
+				} else {
+					console.log(`  ❌ ${key}: NOT FOUND`);
+				}
 			}
 
 			initializeSliders();
-		}, 200); // Increased delay
+		}, 200);
 
 		updateContinueButtonState();
-		console.log("✅ Measurements imported successfully, sliders should now be available");
+		console.log("✅ Measurements imported successfully, all sliders should now be available");
 
 		// Rest of the function remains the same...
 		const bmsElement = document.getElementById("BMs");
@@ -639,7 +1223,6 @@ document.addEventListener("DOMContentLoaded", function () {
 				warningElement.className = "success";
 			}
 
-			// Rest of the function remains the same...
 			const bmsElement = document.getElementById("BMs");
 			const cinemaModesElement = document.getElementById("cinemaModes");
 
@@ -654,7 +1237,7 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 	}
 
-	// Expose function to global scope (keep original)
+	// Expose function to global scope
 	window.onMeasurementsImported = onMeasurementsImported;
 
 	// Script mode radio button handlers (keep original)
@@ -847,16 +1430,10 @@ document.addEventListener("DOMContentLoaded", function () {
 		}
 
 		if (currentStep === 1) {
-			// const cinema_type_radioButtons = currentStepElement.querySelectorAll('input[name="cinema_type"]');
 			const sub_inversion_radioButtons = currentStepElement.querySelectorAll('input[name="sub_inversion"]');
-			// const ade_radioButtons = currentStepElement.querySelectorAll('input[name="script_ade"]');
-			// const ahe_radioButtons = currentStepElement.querySelectorAll('input[name="script_ahe"]');
-			// const is_cinema_type_Selected = Array.from(cinema_type_radioButtons).some((radio) => radio.checked);
 			const is_sub_inversion_Selected = Array.from(sub_inversion_radioButtons).some((radio) => radio.checked);
-			// const is_ade_Selected = Array.from(ade_radioButtons).some((radio) => radio.checked);
-			// const is_ahe_Selected = Array.from(ahe_radioButtons).some((radio) => radio.checked);
 			if (continueButton) {
-				continueButton.disabled = !(/*is_cinema_type_Selected &&*/ is_sub_inversion_Selected /*&& is_ade_Selected && is_ahe_Selected*/);
+				continueButton.disabled = !is_sub_inversion_Selected;
 			}
 		} else if (currentStep === 2) {
 			const cinema_type_radioButtons = currentStepElement.querySelectorAll('input[name="cinema_type"]');
@@ -890,25 +1467,30 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (continueButton) {
 				continueButton.disabled = !subwooferCalibrationCompleted;
 			}
+			// } else if (currentStep === 8) {
 		} else if (currentStep === 8) {
+			// } else if (currentStep === 10) {
 			if (continueButton) {
-				continueButton.disabled = !(generateFiltersCompleted || generateSpeakerCurvesCompleted);
+				continueButton.disabled = !(optimizeSubDelayCompleted || generateAVGCurvesCompleted || generateSpeakerCurvesCompleted);
 			}
+			// } else if (currentStep === 11) {
 		} else if (currentStep === 9) {
+			// } else if (currentStep === 12) {
 			if (continueButton) {
-				continueButton.disabled = !(finalizeTrimsCompleted || generateSubwooferCurvesCompleted);
+				continueButton.disabled = !(finalizeXOCompleted || generateSubwooferCurvesCompleted);
 			}
 		} else if (currentStep === 10) {
 			if (continueButton) {
-				continueButton.disabled = !(optimizeSubDelayCompleted || generateAVGCurvesCompleted);
+				continueButton.disabled = !(generateFiltersCompleted || generateSpeakerCurvesCompleted || generateAVGCurvesCompleted);
 			}
+			// } else if (currentStep === 9) {
 		} else if (currentStep === 11) {
 			if (continueButton) {
-				continueButton.disabled = !(finalizeDistancesCompleted || finalizeRoomCurveCompleted);
+				continueButton.disabled = !(finalizeTrimsCompleted || generateSubwooferCurvesCompleted);
 			}
 		} else if (currentStep === 12) {
 			if (continueButton) {
-				continueButton.disabled = !finalizeXOCompleted;
+				continueButton.disabled = !(finalizeDistancesCompleted || finalizeRoomCurveCompleted);
 			}
 		} else if (currentStep === 13) {
 			if (continueButton) {
@@ -1115,13 +1697,11 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 
 			// Reinitialize slider if needed
-			if (measurementsImported && (sliderInstances.bed || sliderInstances.height)) {
-				console.log("🔄 Cinema mode changed - reinitializing slider with filtered frequencies");
-				// resetSlider();
+			if (measurementsImported && Object.values(sliderInstances).some((s) => s !== null)) {
+				console.log("🔄 Cinema mode changed - reinitializing sliders with filtered frequencies");
 				resetSliders();
 				toggleSliderVisibility(true);
 				setTimeout(() => {
-					// initializeSlider();
 					initializeSliders();
 				}, 100);
 			}
@@ -1296,6 +1876,9 @@ document.addEventListener("DOMContentLoaded", function () {
 					console.log("Reached step 1 - Set your default options");
 					(async () => {
 						try {
+							await clearCommands();
+							await disableGraph();
+							await enableBlock();
 							if (typeof SetTargetlevel === "function") SetTargetlevel();
 							console.log(`Targetlevel: ${typeof targetLevel !== "undefined" ? targetLevel : "undefined"}dB correction set successfully`);
 							console.log("DEBUG: About to call SetnoInversion...");
@@ -1366,18 +1949,6 @@ document.addEventListener("DOMContentLoaded", function () {
 							if (typeof validateConfiguration === "function") {
 								validateConfiguration();
 							}
-							// TEST
-
-							// TEST
-							// if (typeof detectSBIRFromMeasurements === "function") {
-							// Add SBIR detection before filter generation
-							//	sbirPatterns = await detectSBIRFromMeasurements();
-							//	console.error("test not an error!");
-							//	console.error("detectSBIRFromMeasurements -> RAN!");
-							//	console.error("test not an error!");
-							// }
-							// TEST
-
 							updateContinueButtonState();
 						} catch (error) {
 							handleAutoModeError("debugREW or groundWorks", error);
@@ -1399,7 +1970,8 @@ document.addEventListener("DOMContentLoaded", function () {
 							if (typeof calculateRolloffs === "function") {
 								await calculateRolloffs();
 							}
-							console.log(`✅ Speaker rolloff calculations against ${typeof targetCurveName !== "undefined" ? targetCurveName : "target"} curve completed successfully`);
+							// console.log(`✅ Speaker rolloff calculations against ${typeof targetCurveName !== "undefined" ? targetCurveName : "target"} curve completed successfully`);
+							console.log(`✅ Speaker rolloff calculations against completed successfully`);
 							speakerCalibrationCompleted = true;
 							updateContinueButtonState();
 						} catch (error) {
@@ -1422,7 +1994,8 @@ document.addEventListener("DOMContentLoaded", function () {
 							if (typeof calculateSubBandwidth === "function") {
 								await calculateSubBandwidth();
 							}
-							console.log(`✅ Subwoofer rolloff calculations against ${typeof targetCurveName !== "undefined" ? targetCurveName : "target"} curve completed successfully`);
+							// console.log(`✅ Subwoofer rolloff calculations against ${typeof targetCurveName !== "undefined" ? targetCurveName : "target"} curve completed successfully`);
+							console.log(`✅ Subwoofer rolloff calculations completed successfully`);
 							subwooferCalibrationCompleted = true;
 							updateContinueButtonState();
 						} catch (error) {
@@ -1433,10 +2006,118 @@ document.addEventListener("DOMContentLoaded", function () {
 					})();
 				}
 
+				// if (currentStep === 10) {
 				if (currentStep === 8) {
 					// ClariQ Next
 					if (isClearCurve == false) {
-						console.log("Reached step 8 - triggering Generate filters");
+						// NART is ALWAYS enabled - skip traditional sub optimization entirely
+						console.log("✓ Skipping step 8 - NART handles all sub alignment in step 10");
+						optimizeSubDelayCompleted = true;
+						updateContinueButtonState();
+						return; // Skip this step for ALL bass modes
+						/*
+						// Check if NART already handled subwoofer optimization
+						if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
+							console.log("✓ Skipping step 8 - NART already optimized directional bass");
+							optimizeSubDelayCompleted = true;
+							updateContinueButtonState();
+							return; // Skip this step entirely
+						}
+						// Check if NART already handled subwoofer optimization
+						console.log("Reached step 8 - triggering Optimize subwoofer(s) delay ");
+						optimizeSubDelayCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting subwoofer(s) delay optimisation...");
+								if (typeof optimizeSubDelay === "function") {
+									await optimizeSubDelay();
+								}
+								console.log(`✅ subwoofer(s) delay optimisation completed successfully`);
+								optimizeSubDelayCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("subwoofer(s) delay optimisation", error);
+								optimizeSubDelayCompleted = false;
+								updateContinueButtonState();
+							}
+						})();
+						*/
+					} else {
+						console.log("Reached step 10 - triggering Generate speaker curves");
+						// generateFiltersCompleted = false;
+						generateSpeakerCurvesCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Speaker Curves generation...");
+								if (typeof TheCurves === "function") {
+									await TheCurves();
+								}
+								console.log(`✅ Speaker Curves generation completed successfully`);
+								generateSpeakerCurvesCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Speaker Curves generation", error);
+								generateSpeakerCurvesCompleted = false;
+								updateContinueButtonState();
+							}
+						})();
+					}
+				}
+
+				// if (currentStep === 12) {
+				if (currentStep === 9) {
+					if (isClearCurve == false) {
+						console.log("Reached step 9 - triggering Finalize crossovers");
+						finalizeXOCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Finalize crossovers optimisation...");
+								if (typeof finalizeXO === "function") {
+									await finalizeXO();
+								}
+								console.log(`✅ Finalize crossovers optimisation completed successfully`);
+								finalizeXOCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Finalize crossovers", error);
+								finalizeXOCompleted = false;
+								updateContinueButtonState();
+							}
+						})();
+					} else {
+						console.log("Reached step 11 - triggering Generate subwoofer(s) curves");
+						generateSubwooferCurvesCompleted = false;
+						updateContinueButtonState();
+						(async () => {
+							try {
+								console.log("🔧 Starting Generate subwoofer(s) curves...");
+								if (typeof TheCurvesSubwoofer === "function") {
+									await TheCurvesSubwoofer();
+								}
+								console.log(`✅ Generate subwoofer(s) curves completed successfully`);
+								generateSubwooferCurvesCompleted = true;
+								updateContinueButtonState();
+							} catch (error) {
+								handleAutoModeError("Generate subwoofer(s) curves", error);
+								generateSubwooferCurvesCompleted = false;
+								updateContinueButtonState();
+							}
+						})();
+					}
+				}
+
+				// WE NEED TO CONFIGURE NART HERE
+
+				// WE NEED TO CONFIGURE NART HERE
+
+				// if (currentStep === 8) {
+				if (currentStep === 10) {
+					// ClariQ Next
+					if (isClearCurve == false) {
+						console.log("Reached step 10 - triggering Generate filters");
 						generateFiltersCompleted = false;
 						// generateSpeakerCurvesCompleted = false;
 						updateContinueButtonState();
@@ -1446,12 +2127,13 @@ document.addEventListener("DOMContentLoaded", function () {
 								if (typeof optimizeSubDelayART === "function") {
 									await optimizeSubDelayART();
 								}
-								// await optimizeSubDelayART(); // NEW STEP 8A - run BEFORE combining subs
+								if (typeof applyModalCancellationDelays === "function") {
+									await applyModalCancellationDelays();
+								}
 								if (typeof convertDirectionalIfNeeded === "function") {
 									await convertDirectionalIfNeeded();
 								}
 								console.log("🔧 NART Done...");
-								// await convertDirectionalIfNeeded(); // NEW STEP 8B - NOW combine subs
 
 								// ADD THIS: Detect SBIR before filter generation
 								console.log("🔧 Detect SBIR before filter generation...");
@@ -1476,102 +2158,7 @@ document.addEventListener("DOMContentLoaded", function () {
 						})();
 						// ClearCurve Next
 					} else {
-						console.log("Reached step 8 - triggering Generate speaker curves");
-						// generateFiltersCompleted = false;
-						generateSpeakerCurvesCompleted = false;
-						updateContinueButtonState();
-						(async () => {
-							try {
-								console.log("🔧 Starting Speaker Curves generation...");
-								if (typeof TheCurves === "function") {
-									await TheCurves();
-								}
-								console.log(`✅ Speaker Curves generation completed successfully`);
-								generateSpeakerCurvesCompleted = true;
-								updateContinueButtonState();
-							} catch (error) {
-								handleAutoModeError("Speaker Curves generation", error);
-								generateSpeakerCurvesCompleted = false;
-								updateContinueButtonState();
-							}
-						})();
-					}
-				}
-
-				if (currentStep === 9) {
-					// ClariQ Next
-					if (isClearCurve == false) {
-						console.log("Reached step 9 - triggering Finalize Trims");
-						finalizeTrimsCompleted = false;
-						updateContinueButtonState();
-						(async () => {
-							try {
-								console.log("🔧 Starting Finalize trims...");
-								if (typeof finalizeTrims === "function") {
-									finalizeTrims();
-								}
-								console.log(`✅ Finalize trims completed successfully`);
-								finalizeTrimsCompleted = true;
-								updateContinueButtonState();
-							} catch (error) {
-								handleAutoModeError("Finalize trims", error);
-								finalizeTrimsCompleted = false;
-								updateContinueButtonState();
-							}
-						})();
-					} else {
-						console.log("Reached step 9 - triggering Generate subwoofer(s) curves");
-						generateSubwooferCurvesCompleted = false;
-						updateContinueButtonState();
-						(async () => {
-							try {
-								console.log("🔧 Starting Generate subwoofer(s) curves...");
-								if (typeof TheCurvesSubwoofer === "function") {
-									await TheCurvesSubwoofer();
-								}
-								console.log(`✅ Generate subwoofer(s) curves completed successfully`);
-								generateSubwooferCurvesCompleted = true;
-								updateContinueButtonState();
-							} catch (error) {
-								handleAutoModeError("Generate subwoofer(s) curves", error);
-								generateSubwooferCurvesCompleted = false;
-								updateContinueButtonState();
-							}
-						})();
-					}
-				}
-
-				if (currentStep === 10) {
-					// ClariQ Next
-					if (isClearCurve == false) {
-						// Check if NART already handled subwoofer optimization
-						if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
-							console.log("✓ Skipping step 10 - NART already optimized directional bass");
-							optimizeSubDelayCompleted = true;
-							updateContinueButtonState();
-							return; // Skip this step entirely
-						}
-						// Check if NART already handled subwoofer optimization
-						console.log("Reached step 10 - triggering Optimize subwoofer(s) delay ");
-						optimizeSubDelayCompleted = false;
-						updateContinueButtonState();
-						(async () => {
-							try {
-								console.log("🔧 Starting subwoofer(s) delay optimisation...");
-								if (typeof optimizeSubDelay === "function") {
-									await optimizeSubDelay();
-								}
-								console.log(`✅ subwoofer(s) delay optimisation completed successfully`);
-								optimizeSubDelayCompleted = true;
-								updateContinueButtonState();
-							} catch (error) {
-								handleAutoModeError("subwoofer(s) delay optimisation", error);
-								optimizeSubDelayCompleted = false;
-								updateContinueButtonState();
-							}
-						})();
-					} else {
-						console.log("Reached step 10 - triggering Generate average curves");
+						console.log("Reached step 8 - triggering Generate average curves");
 						generateAVGCurvesCompleted = false;
 						updateContinueButtonState();
 						(async () => {
@@ -1592,29 +2179,30 @@ document.addEventListener("DOMContentLoaded", function () {
 					}
 				}
 
+				// if (currentStep === 9) {
 				if (currentStep === 11) {
 					// ClariQ Next
 					if (isClearCurve == false) {
-						console.log("Reached step 11 - triggering Finalize distances");
-						finalizeDistancesCompleted = false;
+						console.log("Reached step 11 - triggering Finalize Trims");
+						finalizeTrimsCompleted = false;
 						updateContinueButtonState();
 						(async () => {
 							try {
-								console.log("🔧 Starting Finalize distances optimisation...");
-								if (typeof finalizeDistances === "function") {
-									finalizeDistances();
+								console.log("🔧 Starting Finalize trims...");
+								if (typeof finalizeTrims === "function") {
+									finalizeTrims();
 								}
-								console.log(`✅ Finalize distances optimisation completed successfully`);
-								finalizeDistancesCompleted = true;
+								console.log(`✅ Finalize trims completed successfully`);
+								finalizeTrimsCompleted = true;
 								updateContinueButtonState();
 							} catch (error) {
-								handleAutoModeError("Finalize distances", error);
-								finalizeDistancesCompleted = false;
+								handleAutoModeError("Finalize trims", error);
+								finalizeTrimsCompleted = false;
 								updateContinueButtonState();
 							}
 						})();
 					} else {
-						console.log("Reached step 11 - triggering Finalize House curve");
+						console.log("Reached step 12 - triggering Finalize House curve");
 						finalizeRoomCurveCompleted = false;
 						updateContinueButtonState();
 						(async () => {
@@ -1640,25 +2228,31 @@ document.addEventListener("DOMContentLoaded", function () {
 					}
 				}
 
+				// if (currentStep === 11) {
 				if (currentStep === 12) {
-					console.log("Reached step 12 - triggering Finalize crossovers");
-					finalizeXOCompleted = false;
+					// ClariQ Next
+					// if (isClearCurve == false) {
+					console.log("Reached step 12 - triggering Finalize distances");
+					finalizeDistancesCompleted = false;
 					updateContinueButtonState();
 					(async () => {
 						try {
-							console.log("🔧 Starting Finalize crossovers optimisation...");
-							if (typeof finalizeXO === "function") {
-								await finalizeXO();
+							console.log("🔧 Starting Finalize distances optimisation...");
+							if (typeof finalizeDistances === "function") {
+								finalizeDistances();
 							}
-							console.log(`✅ Finalize crossovers optimisation completed successfully`);
-							finalizeXOCompleted = true;
+							console.log(`✅ Finalize distances optimisation completed successfully`);
+							finalizeDistancesCompleted = true;
 							updateContinueButtonState();
 						} catch (error) {
-							handleAutoModeError("Finalize crossovers", error);
-							finalizeXOCompleted = false;
+							handleAutoModeError("Finalize distances", error);
+							finalizeDistancesCompleted = false;
 							updateContinueButtonState();
 						}
 					})();
+					//} else {
+					//
+					//}
 				}
 
 				if (currentStep === 13) {
@@ -1710,6 +2304,8 @@ document.addEventListener("DOMContentLoaded", function () {
 								await runCEDIAReadOnlyAssessment();
 								saveLogAsPDF();
 							}
+							await disableBlock();
+							await enableGraph();
 						} catch (error) {
 							handleAutoModeError("updateAdy contents", error);
 							updateAdyCompleted = false;
@@ -1988,14 +2584,14 @@ document.addEventListener("DOMContentLoaded", function () {
 					}
 
 					// Only reinitialize sliders if measurements are imported
-					if (measurementsImported && (sliderInstances.bed || sliderInstances.height)) {
+					if (measurementsImported && Object.values(sliderInstances).some((s) => s !== null)) {
 						console.log("🔄 Reinitializing sliders with new cinema mode...");
 
 						resetSliders();
 						toggleSliderVisibility(true);
 
 						setTimeout(() => {
-							initializeSliders(); // Changed from initializeSlider to initializeSliders
+							initializeSliders();
 						}, 100);
 					}
 				}
@@ -2048,6 +2644,96 @@ window.cleanupApp = function () {
 		console.log("🧹 Manual cleanup completed");
 	}
 };
+
+// ============================================================================
+// DEBUG HELPER - NEW
+// ============================================================================
+window.debugSliderState = function () {
+	console.log("🔍 ==== COMPLETE SLIDER DEBUG INFO ====");
+
+	console.log("\n📊 Channel Flags:");
+	const channelFlags = {
+		hasCenterChannel: typeof hasCenterChannel !== "undefined" ? hasCenterChannel : "❌ UNDEFINED",
+		hasCenterHeightChannel: typeof hasCenterHeightChannel !== "undefined" ? hasCenterHeightChannel : "❌ UNDEFINED",
+		hasFrontLeftFrontRightChannel: typeof hasFrontLeftFrontRightChannel !== "undefined" ? hasFrontLeftFrontRightChannel : "❌ UNDEFINED",
+		hasFrontWideLeftFrontWideRightChannel: typeof hasFrontWideLeftFrontWideRightChannel !== "undefined" ? hasFrontWideLeftFrontWideRightChannel : "❌ UNDEFINED",
+		hasSurroundLeftSurroudRightChannel: typeof hasSurroundLeftSurroudRightChannel !== "undefined" ? hasSurroundLeftSurroudRightChannel : "❌ UNDEFINED",
+		hasSurroundBackLeftSurroundBackRightChannel: typeof hasSurroundBackLeftSurroundBackRightChannel !== "undefined" ? hasSurroundBackLeftSurroundBackRightChannel : "❌ UNDEFINED",
+		hasSurroundBackSingleChannel: typeof hasSurroundBackSingleChannel !== "undefined" ? hasSurroundBackSingleChannel : "❌ UNDEFINED",
+		hasHeightChannel: typeof hasHeightChannel !== "undefined" ? hasHeightChannel : "❌ UNDEFINED",
+		hasFrontHeightLeftFrontHeightRightChannel: typeof hasFrontHeightLeftFrontHeightRightChannel !== "undefined" ? hasFrontHeightLeftFrontHeightRightChannel : "❌ UNDEFINED",
+		hasSurroundHeightLeftSurroudHeightRightChannel: typeof hasSurroundHeightLeftSurroudHeightRightChannel !== "undefined" ? hasSurroundHeightLeftSurroudHeightRightChannel : "❌ UNDEFINED",
+		hasRearHeightLeftRearHeightRightChannel: typeof hasRearHeightLeftRearHeightRightChannel !== "undefined" ? hasRearHeightLeftRearHeightRightChannel : "❌ UNDEFINED",
+		hasTopFrontLeftTopFrontRightChannel: typeof hasTopFrontLeftTopFrontRightChannel !== "undefined" ? hasTopFrontLeftTopFrontRightChannel : "❌ UNDEFINED",
+		hasTopMiddleLeftTopMiddleRightChannel: typeof hasTopMiddleLeftTopMiddleRightChannel !== "undefined" ? hasTopMiddleLeftTopMiddleRightChannel : "❌ UNDEFINED",
+		hasTopRearLeftTopRearRightChannel: typeof hasTopRearLeftTopRearRightChannel !== "undefined" ? hasTopRearLeftTopRearRightChannel : "❌ UNDEFINED",
+		hasTopSurroundChannel: typeof hasTopSurroundChannel !== "undefined" ? hasTopSurroundChannel : "❌ UNDEFINED",
+		hasFrontDolbyLeftFrontDolbyRightChannel: typeof hasFrontDolbyLeftFrontDolbyRightChannel !== "undefined" ? hasFrontDolbyLeftFrontDolbyRightChannel : "❌ UNDEFINED",
+		hasSurroundDolbyLeftSurroundDolbyRightChannel: typeof hasSurroundDolbyLeftSurroundDolbyRightChannel !== "undefined" ? hasSurroundDolbyLeftSurroundDolbyRightChannel : "❌ UNDEFINED",
+		hasBackDolbyLeftBackDolbyRightChannel: typeof hasBackDolbyLeftBackDolbyRightChannel !== "undefined" ? hasBackDolbyLeftBackDolbyRightChannel : "❌ UNDEFINED",
+	};
+
+	for (const [key, slider] of Object.entries(sliderInstances)) {
+		if (slider) {
+			const range = slider.getSelectedRange();
+			if (key === "phase_weight") {
+				console.log(`  ✅ ${key}: INITIALIZED (${range.value}% / ${range.normalized.toFixed(2)})`);
+			} else {
+				console.log(`  ✅ ${key}: INITIALIZED (${range.mode === "single" ? range.value + "Hz" : range.min + "-" + range.max + "Hz"})`);
+			}
+		} else {
+			console.log(`  ❌ ${key}: NOT INITIALIZED`);
+		}
+	}
+
+	console.log("\n🎛️ Slider Instances:");
+	for (const [key, slider] of Object.entries(sliderInstances)) {
+		if (slider) {
+			const range = slider.getSelectedRange();
+			console.log(`  ✅ ${key}: INITIALIZED (${range.mode === "single" ? range.value + "Hz" : range.min + "-" + range.max + "Hz"})`);
+		} else {
+			console.log(`  ❌ ${key}: NOT INITIALIZED`);
+		}
+	}
+
+	console.log("\n🏗️ DOM Containers:");
+	const containers = [
+		".slider-container.bed-layer",
+		".slider-container.height-layer",
+		".slider-container.center-channel",
+		".slider-container.height-ch-channel",
+		".slider-container.surround-sb-channel",
+		".slider-container.top-ts-channel",
+		".slider-container.main-fl-fr-channel",
+		".slider-container.main-fwl-fwr-channel",
+		".slider-container.surround-sla-sra-channel",
+		".slider-container.surround-sbl-sbr-channel",
+		".slider-container.height-fhl-fhr-channel",
+		".slider-container.height-shl-shr-channel",
+		".slider-container.height-rhl-rhr-channel",
+		".slider-container.top-tfl-tfr-channel",
+		".slider-container.top-tml-tmr-channel",
+		".slider-container.top-trl-trr-channel",
+		".slider-container.dolby-fdl-fdr-channel",
+		".slider-container.dolby-sdl-sdr-channel",
+		".slider-container.dolby-bdl-bdr-channel",
+	];
+
+	containers.forEach((selector) => {
+		const el = document.querySelector(selector);
+		if (el) {
+			const isVisible = el.offsetWidth > 0 && el.offsetHeight > 0;
+			console.log(`  ${isVisible ? "✅" : "⚠️ "} ${selector}`);
+			console.log(`      display: ${el.style.display || "default"}, visible: ${isVisible}`);
+		} else {
+			console.log(`  ❌ ${selector}: NOT FOUND IN DOM`);
+		}
+	});
+
+	console.log("\n==== END DEBUG INFO ====");
+};
+
+console.log("💡 Complete slider debugging loaded! Run window.debugSliderState() anytime");
 
 // keep all the long stuff here
 const micCal = `* Impulse Response data saved by REW

@@ -1,4 +1,4 @@
-/* ClariQ Next 0.0.14 - 08-10-2025 @ 13:44 */
+/* ClariQ Next 0.1.0 - 19-10-2025 @ 17:24 */
 :root {
 	--primary-color: #2563eb;
 	--secondary-color: #3b82f6;
@@ -324,8 +324,8 @@ body {
 	color: var(--log-text);
 	padding: 5px;
 	border-radius: 5px;
-	/* max-height: 280px; */
-	max-height: 600px;
+	max-height: 280px;
+	/* max-height: 600px; */
 	overflow-y: auto;
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 	margin-bottom: 1px;
@@ -645,4 +645,52 @@ ul li {
 	color: var(--text-color);
 	border: 1px solid var(--border-color);
 	transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* UPDATE 0.1.0 */
+.h1,
+.h2,
+.h3,
+.h4,
+.h5,
+.h6,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	text-decoration: underline;
+}
+
+label {
+	font-size: 16px;
+	font-weight: bold;
+}
+
+ul li {
+	/*font-size: 0.77vw;*/
+	font-size: 15px;
+}
+
+ul ul li {
+	font-size: 14px;
+}
+
+ul ul ul li {
+	font-size: 13px;
+}
+
+.phase-weight-slider {
+	margin-bottom: 2rem;
+	padding: 1.5rem;
+	background: var(--card-bg);
+	border-radius: 8px;
+	border: 1px solid var(--border-color);
+}
+
+.phase-weight-slider .slider-description {
+	margin-top: 1rem;
+	color: var(--text-muted);
+	font-style: italic;
 }
