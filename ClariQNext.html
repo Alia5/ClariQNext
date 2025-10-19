@@ -17,7 +17,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.1.0 - 19-10-2025 @ 17:24";
+    const nextversion = "ClariQ Next 0.1.1 - 19-10-2025 @ 20:24";
     // ClearCurve
     let isClearCurve = false;
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
@@ -3086,57 +3086,58 @@
           console.info(`  Standard mode active (DEFAULT)`);
         }
 
+        // If none of the sliders are touched
         if (!isClearCurve) {
-          if (hasCenterChannel === true) {
-            console.info(`  CENTER range: ${selectedMinFreq_center}-${selectedMaxFreq_center}Hz`);
+          if (hasCenterChannel === true && window.selectedMinFreq_center !== undefined) {
+            console.info(`  CENTER range: ${window.selectedMinFreq_center}-${window.selectedMaxFreq_center}Hz`);
           }
-          if (hasFrontLeftFrontRightChannel === true) {
-            console.info(`  FRONT LEFT & RIGHT range: ${selectedMinFreq_main_fl_fr}-${selectedMaxFreq_main_fl_fr}Hz`);
+          if (hasFrontLeftFrontRightChannel === true && window.selectedMinFreq_main_fl_fr !== undefined) {
+            console.info(`  FRONT LEFT & RIGHT range: ${window.selectedMinFreq_main_fl_fr}-${window.selectedMaxFreq_main_fl_fr}Hz`);
           }
-          if (hasSurroundLeftSurroudRightChannel === true) {
-            console.info(`  SURROUND LEFT & RIGHT range: ${selectedMinFreq_surround_sla_sra}-${selectedMaxFreq_surround_sla_sra}Hz`);
+          if (hasSurroundLeftSurroudRightChannel === true && window.selectedMinFreq_surround_sla_sra !== undefined) {
+            console.info(`  SURROUND LEFT & RIGHT range: ${window.selectedMinFreq_surround_sla_sra}-${window.selectedMaxFreq_surround_sla_sra}Hz`);
           }
-          if (hasSurroundBackLeftSurroundBackRightChannel === true) {
-            console.info(`  SURROUND BACK LEFT & RIGHT range: ${selectedMinFreq_surround_sbl_sbr}-${selectedMaxFreq_surround_sbl_sbr}Hz`);
+          if (hasSurroundBackLeftSurroundBackRightChannel === true && window.selectedMinFreq_surround_sbl_sbr !== undefined) {
+            console.info(`  SURROUND BACK LEFT & RIGHT range: ${window.selectedMinFreq_surround_sbl_sbr}-${window.selectedMaxFreq_surround_sbl_sbr}Hz`);
           }
-          if (hasSurroundBackSingleChannel === true) {
-            console.info(`  SURROUND BACK SINGLE range: ${selectedMinFreq_surround_sb}-${selectedMaxFreq_surround_sb}Hz`);
+          if (hasSurroundBackSingleChannel === true && window.selectedMinFreq_surround_sb !== undefined) {
+            console.info(`  SURROUND BACK SINGLE range: ${window.selectedMinFreq_surround_sb}-${window.selectedMaxFreq_surround_sb}Hz`);
           }
-          if (hasFrontWideLeftFrontWideRightChannel === true) {
-            console.info(`  FRONT WIDE LEFT & RIGHT range: ${selectedMinFreq_main_fwl_fwr}-${selectedMaxFreq_main_fwl_fwr}Hz`);
+          if (hasFrontWideLeftFrontWideRightChannel === true && window.selectedMinFreq_main_fwl_fwr !== undefined) {
+            console.info(`  FRONT WIDE LEFT & RIGHT range: ${window.selectedMinFreq_main_fwl_fwr}-${window.selectedMaxFreq_main_fwl_fwr}Hz`);
           }
-          if (hasFrontHeightLeftFrontHeightRightChannel === true) {
-            console.info(`  FRONT HEIGHT LEFT & RIGHT range: ${selectedMinFreq_height_fhl_fhr}-${selectedMaxFreq_height_fhl_fhr}Hz`);
+          if (hasFrontHeightLeftFrontHeightRightChannel === true && window.selectedMinFreq_height_fhl_fhr !== undefined) {
+            console.info(`  FRONT HEIGHT LEFT & RIGHT range: ${window.selectedMinFreq_height_fhl_fhr}-${window.selectedMaxFreq_height_fhl_fhr}Hz`);
           }
-          if (hasSurroundHeightLeftSurroudHeightRightChannel === true) {
-            console.info(`  SURROUND HEIGHT LEFT & RIGHT range: ${selectedMinFreq_height_shl_shr}-${selectedMaxFreq_height_shl_shr}Hz`);
+          if (hasSurroundHeightLeftSurroudHeightRightChannel === true && window.selectedMinFreq_height_shl_shr !== undefined) {
+            console.info(`  SURROUND HEIGHT LEFT & RIGHT range: ${window.selectedMinFreq_height_shl_shr}-${window.selectedMaxFreq_height_shl_shr}Hz`);
           }
-          if (hasRearHeightLeftRearHeightRightChannel === true) {
-            console.info(`  REAR HEIGHT LEFT & RIGHT range: ${selectedMinFreq_height_rhl_rhr}-${selectedMaxFreq_height_rhl_rhr}Hz`);
+          if (hasRearHeightLeftRearHeightRightChannel === true && window.selectedMinFreq_height_rhl_rhr !== undefined) {
+            console.info(`  REAR HEIGHT LEFT & RIGHT range: ${window.selectedMinFreq_height_rhl_rhr}-${window.selectedMaxFreq_height_rhl_rhr}Hz`);
           }
-          if (hasCenterHeightChannel === true) {
-            console.info(`  CENTER HEIGHT (AURO3D) range: ${selectedMinFreq_height_ch}-${selectedMaxFreq_height_ch}Hz`);
+          if (hasCenterHeightChannel === true && window.selectedMinFreq_height_ch !== undefined) {
+            console.info(`  CENTER HEIGHT (AURO3D) range: ${window.selectedMinFreq_height_ch}-${window.selectedMaxFreq_height_ch}Hz`);
           }
-          if (hasTopFrontLeftTopFrontRightChannel === true) {
-            console.info(`  TOP FRONT LEFT & RIGHT range: ${selectedMinFreq_top_tfl_tfr}-${selectedMaxFreq_top_tfl_tfr}Hz`);
+          if (hasTopFrontLeftTopFrontRightChannel === true && window.selectedMinFreq_top_tfl_tfr !== undefined) {
+            console.info(`  TOP FRONT LEFT & RIGHT range: ${window.selectedMinFreq_top_tfl_tfr}-${window.selectedMaxFreq_top_tfl_tfr}Hz`);
           }
-          if (hasTopMiddleLeftTopMiddleRightChannel === true) {
-            console.info(`  TOP MIDDLE LEFT & RIGHT range: ${selectedMinFreq_top_tml_tmr}-${selectedMaxFreq_top_tml_tmr}Hz`);
+          if (hasTopMiddleLeftTopMiddleRightChannel === true && window.selectedMinFreq_top_tml_tmr !== undefined) {
+            console.info(`  TOP MIDDLE LEFT & RIGHT range: ${window.selectedMinFreq_top_tml_tmr}-${window.selectedMaxFreq_top_tml_tmr}Hz`);
           }
-          if (hasTopRearLeftTopRearRightChannel === true) {
-            console.info(`  TOP REAR LEFT & RIGHT range: ${selectedMinFreq_top_trl_trr}-${selectedMaxFreq_top_trl_trr}Hz`);
+          if (hasTopRearLeftTopRearRightChannel === true && window.selectedMinFreq_top_trl_trr !== undefined) {
+            console.info(`  TOP REAR LEFT & RIGHT range: ${window.selectedMinFreq_top_trl_trr}-${window.selectedMaxFreq_top_trl_trr}Hz`);
           }
-          if (hasTopSurroundChannel === true) {
-            console.info(`  TOP SURROUND (AURO3D) range: ${selectedMinFreq_top_ts}-${selectedMaxFreq_top_ts}Hz`);
+          if (hasTopSurroundChannel === true && window.selectedMinFreq_top_ts !== undefined) {
+            console.info(`  TOP SURROUND (AURO3D) range: ${window.selectedMinFreq_top_ts}-${window.selectedMaxFreq_top_ts}Hz`);
           }
-          if (hasFrontDolbyLeftFrontDolbyRightChannel === true) {
-            console.info(`  FRONT DOLBY LEFT & RIGHT range: ${selectedMinFreq_dolby_fdl_fdr}-${selectedMaxFreq_dolby_fdl_fdr}Hz`);
+          if (hasFrontDolbyLeftFrontDolbyRightChannel === true && window.selectedMinFreq_dolby_fdl_fdr !== undefined) {
+            console.info(`  FRONT DOLBY LEFT & RIGHT range: ${window.selectedMinFreq_dolby_fdl_fdr}-${window.selectedMaxFreq_dolby_fdl_fdr}Hz`);
           }
-          if (hasSurroundDolbyLeftSurroundDolbyRightChannel === true) {
-            console.info(`  SURROUND DOLBY LEFT & RIGHT range: ${selectedMinFreq_dolby_sdl_sdr}-${selectedMaxFreq_dolby_sdl_sdr}Hz`);
+          if (hasSurroundDolbyLeftSurroundDolbyRightChannel === true && window.selectedMinFreq_dolby_sdl_sdr !== undefined) {
+            console.info(`  SURROUND DOLBY LEFT & RIGHT range: ${window.selectedMinFreq_dolby_sdl_sdr}-${window.selectedMaxFreq_dolby_sdl_sdr}Hz`);
           }
-          if (hasBackDolbyLeftBackDolbyRightChannel === true) {
-            console.info(`  BACK DOLBY LEFT & RIGHT range: ${selectedMinFreq_dolby_bdl_bdr}-${selectedMaxFreq_dolby_bdl_bdr}Hz`);
+          if (hasBackDolbyLeftBackDolbyRightChannel === true && window.selectedMinFreq_dolby_bdl_bdr !== undefined) {
+            console.info(`  BACK DOLBY LEFT & RIGHT range: ${window.selectedMinFreq_dolby_bdl_bdr}-${window.selectedMaxFreq_dolby_bdl_bdr}Hz`);
           }
           console.info(`  Phase Weight: ${window.phaseWeight}`);
         }
