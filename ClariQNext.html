@@ -17,7 +17,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.1.1 - 19-10-2025 @ 20:24";
+    const nextversion = "ClariQ Next 0.1.2 - 20-10-2025 @ 16:33";
     // ClearCurve
     let isClearCurve = false;
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
@@ -4204,7 +4204,8 @@
           catch (error) {
             console.debug(`${commandId[i]} could not be equalized!`);
           }
-          // SANITY CHECK: Ensure no filters exceed limits AND clear reserved filter slots
+
+          // SANITY CHECK #1: Ensure no filters exceed limits AND clear reserved filter slots
           try {
             let filters = await getFilters(i);
             // Check for reserved filter slot usage (21=HP, 22=LP)
@@ -4345,6 +4346,177 @@
             }
             // SBIR check
             await checkAndDisableSBIRFilters(i, filters);
+          }
+          catch (error) {
+            console.debug(`${commandId[i]} - Sanity check failed:`, error);
+          }
+
+          // SANITY CHECK #2 including re-match: Ensure no filters exceed limits AND clear reserved filter slots
+          try {
+            let filters = await getFilters(i);
+            // Check for reserved filter slot usage (21=HP, 22=LP)
+            const reservedFilters = filters.filter(f =>
+              (f.index === 21 || f.index === 22) && f.type !== "None"
+            );
+            if (reservedFilters.length > 0) {
+              console.warn(`${commandId[i]} - Found ${reservedFilters.length} reserved filter slot(s) in use: ⚠`);
+              const filtersToApply = [];
+              let usedSlot20 = false;
+              let usedSlot19 = false;
+              // Changed from forEach to for...of
+              for (const f of reservedFilters) {
+                console.warn(`├─ Filter ${f.index}: ${f.type} at ${f.frequency?.toFixed(2) || 'N/A'}Hz - CLEARING (reserved slot) ⚠`);
+                // Convert High Pass (Filter 21) to TWO Parametric filters
+                if (f.type === "High pass" && f.frequency) {
+                  const targetSlot1 = 20;
+                  const targetSlot2 = 19;
+                  usedSlot20 = true;
+                  usedSlot19 = true;
+                  const hpFreq = f.frequency;
+                  // Problem is BELOW the HP frequency
+                  const checkRangeStart = Math.max(20, hpFreq * 0.3);
+                  const checkRangeEnd = hpFreq * 0.9;
+                  console.warn(`├─ HP at ${hpFreq.toFixed(0)}Hz detected - analyzing bass region BELOW cutoff`);
+                  const currentResponse = await fetchSafe("frequency-response?smoothing=Var&ppo=96", i);
+                  const rpArray = response2array(currentResponse, checkRangeStart, checkRangeEnd);
+                  const tcArray = response2array(targetResponse, checkRangeStart, checkRangeEnd);
+                  if (!rpArray || !tcArray || rpArray.length === 0 || tcArray.length === 0) {
+                    console.warn(`├─ Could not analyze deviation - using default PK filters`);
+                    filtersToApply.push(createREWFilter(targetSlot1, "PK", hpFreq / 1.5, -6, 2.5));
+                    filtersToApply.push(createREWFilter(targetSlot2, "PK", hpFreq / 2.5, -6, 2.5));
+                  } else {
+                    // Find the TWO worst frequencies
+                    const topDeviations = findTopDeviations(rpArray, tcArray, checkRangeStart, checkRangeEnd, 2);
+                    const { rms, mean } = getDeviationStats(rpArray, tcArray);
+                    console.log(`📊 Analysis of ${checkRangeStart.toFixed(0)}Hz-${checkRangeEnd.toFixed(0)}Hz region:`);
+                    console.log(`   ├─ Average deviation: ${mean.toFixed(2)}dB (RMS: ${rms.toFixed(2)}dB)`);
+                    if (topDeviations.length >= 2) {
+                      console.log(`   ├─ Worst peak: ${topDeviations[0].deviation.toFixed(2)}dB at ${topDeviations[0].frequency.toFixed(0)}Hz`);
+                      console.log(`   └─ 2nd worst peak: ${topDeviations[1].deviation.toFixed(2)}dB at ${topDeviations[1].frequency.toFixed(0)}Hz`);
+                      const pkGain1 = Math.max(-10, Math.min(-3, -topDeviations[0].deviation));
+                      const pkGain2 = Math.max(-10, Math.min(-3, -topDeviations[1].deviation));
+                      const pkQ = 2.5;
+                      console.warn(`├─ Converting HP at ${hpFreq.toFixed(0)}Hz to TWO Parametric filters:`);
+                      console.warn(`   ├─ Slot ${targetSlot1}: ${topDeviations[0].frequency.toFixed(0)}Hz, ${pkGain1.toFixed(1)}dB, Q=${pkQ}`);
+                      console.warn(`   └─ Slot ${targetSlot2}: ${topDeviations[1].frequency.toFixed(0)}Hz, ${pkGain2.toFixed(1)}dB, Q=${pkQ}`);
+                      filtersToApply.push(createREWFilter(targetSlot1, "PK", topDeviations[0].frequency, pkGain1, pkQ));
+                      filtersToApply.push(createREWFilter(targetSlot2, "PK", topDeviations[1].frequency, pkGain2, pkQ));
+                    } else if (topDeviations.length === 1) {
+                      // Only one significant peak found
+                      console.log(`   └─ Peak deviation: ${topDeviations[0].deviation.toFixed(2)}dB at ${topDeviations[0].frequency.toFixed(0)}Hz`);
+                      const pkGain = Math.max(-10, Math.min(-3, -topDeviations[0].deviation));
+                      const pkQ = 2.5;
+                      console.warn(`├─ Converting HP at ${hpFreq.toFixed(0)}Hz to Parametric at slot ${targetSlot1}`);
+                      console.warn(`   └─ Targeting ${topDeviations[0].frequency.toFixed(0)}Hz: ${pkGain.toFixed(1)}dB, Q=${pkQ}`);
+                      filtersToApply.push(createREWFilter(targetSlot1, "PK", topDeviations[0].frequency, pkGain, pkQ));
+                    }
+                  }
+                }
+
+                // Convert Low Pass (Filter 22) to TWO Parametric filters
+                if (f.type === "Low pass" && f.frequency) {
+                  const targetSlot1 = 19;
+                  const targetSlot2 = 18;
+                  usedSlot19 = true;
+                  const lpFreq = f.frequency;
+                  // Problem is ABOVE the LP frequency
+                  const checkRangeStart = lpFreq * 1.1;
+                  const checkRangeEnd = Math.min(20000, lpFreq * 3);
+                  console.warn(`├─ LP at ${lpFreq.toFixed(0)}Hz detected - analyzing treble region ABOVE cutoff`);
+                  const currentResponse = await fetchSafe("frequency-response?smoothing=Var&ppo=96", i);
+                  const rpArray = response2array(currentResponse, checkRangeStart, checkRangeEnd);
+                  const tcArray = response2array(targetResponse, checkRangeStart, checkRangeEnd);
+                  if (!rpArray || !tcArray || rpArray.length === 0 || tcArray.length === 0) {
+                    console.warn(`├─ Could not analyze deviation - using default PK filters`);
+                    filtersToApply.push(createREWFilter(targetSlot1, "PK", lpFreq * 1.5, -6, 2.5));
+                    filtersToApply.push(createREWFilter(targetSlot2, "PK", lpFreq * 2.0, -6, 2.5));
+                  } else {
+                    // Find the TWO worst frequencies
+                    const topDeviations = findTopDeviations(rpArray, tcArray, checkRangeStart, checkRangeEnd, 2);
+                    const { rms, mean } = getDeviationStats(rpArray, tcArray);
+                    console.log(`📊 Analysis of ${checkRangeStart.toFixed(0)}Hz-${checkRangeEnd.toFixed(0)}Hz region:`);
+                    console.log(`   ├─ Average deviation: ${mean.toFixed(2)}dB (RMS: ${rms.toFixed(2)}dB)`);
+                    if (topDeviations.length >= 2) {
+                      console.log(`   ├─ Worst peak: ${topDeviations[0].deviation.toFixed(2)}dB at ${topDeviations[0].frequency.toFixed(0)}Hz`);
+                      console.log(`   └─ 2nd worst peak: ${topDeviations[1].deviation.toFixed(2)}dB at ${topDeviations[1].frequency.toFixed(0)}Hz`);
+                      const pkGain1 = Math.max(-10, Math.min(-3, -topDeviations[0].deviation));
+                      const pkGain2 = Math.max(-10, Math.min(-3, -topDeviations[1].deviation));
+                      const pkQ = 2.5;
+                      console.warn(`├─ Converting LP at ${lpFreq.toFixed(0)}Hz to TWO Parametric filters:`);
+                      console.warn(`   ├─ Slot ${targetSlot1}: ${topDeviations[0].frequency.toFixed(0)}Hz, ${pkGain1.toFixed(1)}dB, Q=${pkQ}`);
+                      console.warn(`   └─ Slot ${targetSlot2}: ${topDeviations[1].frequency.toFixed(0)}Hz, ${pkGain2.toFixed(1)}dB, Q=${pkQ}`);
+                      filtersToApply.push(createREWFilter(targetSlot1, "PK", topDeviations[0].frequency, pkGain1, pkQ));
+                      filtersToApply.push(createREWFilter(targetSlot2, "PK", topDeviations[1].frequency, pkGain2, pkQ));
+                    } else if (topDeviations.length === 1) {
+                      // Only one significant peak found
+                      console.log(`   └─ Peak deviation: ${topDeviations[0].deviation.toFixed(2)}dB at ${topDeviations[0].frequency.toFixed(0)}Hz`);
+                      const pkGain = Math.max(-10, Math.min(-3, -topDeviations[0].deviation));
+                      const pkQ = 2.5;
+                      console.warn(`├─ Converting LP at ${lpFreq.toFixed(0)}Hz to Parametric at slot ${targetSlot1}`);
+                      console.warn(`   └─ Targeting ${topDeviations[0].frequency.toFixed(0)}Hz: ${pkGain.toFixed(1)}dB, Q=${pkQ}`);
+                      filtersToApply.push(createREWFilter(targetSlot1, "PK", topDeviations[0].frequency, pkGain, pkQ));
+                    }
+                  }
+                }
+                // Clear the reserved slot
+                filtersToApply.push({
+                  index: f.index,
+                  type: "None",
+                  enabled: false
+                });
+              }
+              // Apply all filter changes at once
+              await postSafe(
+                `${baseUrl}/${i}/filters`,
+                { filters: filtersToApply },
+                "Filters set"
+              );
+              await customDelay(speedDelay / 2);
+              // Re-fetch filters after conversion
+              filters = await getFilters(i);
+              console.info(`✓ Re-fetched filters after conversion`);
+            }
+            // Run standard violation checks
+            const violations = sanityCheck(filters);
+            if (violations) {
+              const boostViolations = violations.filter(v => v.currentGain > 3).length;
+              const cutViolations = violations.filter(v => v.currentGain < -10).length;
+              if (boostViolations && cutViolations) {
+                console.warn(`⚠ ${commandId[i]} - Fixed ${boostViolations} boost and ${cutViolations} cut filter violations`);
+              } else if (boostViolations) {
+                console.warn(`⚠ ${commandId[i]} - Fixed ${boostViolations} filter(s) exceeding +3dB boost limit`);
+              } else {
+                console.warn(`⚠ ${commandId[i]} - Fixed ${cutViolations} filter(s) exceeding -10dB cut limit`);
+              }
+              await updateFilters(i, violations);
+            }
+            // SBIR check
+            await checkAndDisableSBIRFilters(i, filters);
+
+            // ====================================
+            // Re-match target after all modifications
+            // ====================================
+            console.info(`├─ Re-matching target after filter corrections...`);
+            try {
+              await postNext('Match target', i);
+              console.info(`✓ Target re-matched successfully`);
+
+              // FETCH AND DISPLAY FILTERS AFTER RE-MATCH
+              const filtersAfterRematch = await getFilters(i);
+              const activeFiltersAfterRematch = filtersAfterRematch.filter(f => f.enabled && f.type !== "None");
+
+              console.log(`🔍 FILTERS AFTER RE-MATCH (${activeFiltersAfterRematch.length} active):`);
+              activeFiltersAfterRematch.forEach(f => {
+                const gain = f.gaindB !== undefined ? `${f.gaindB >= 0 ? '+' : ''}${f.gaindB.toFixed(1)}dB` : 'N/A';
+                const q = f.q !== undefined ? `Q: ${f.q.toFixed(1)}` : '';
+                console.log(`├─ Filter ${f.index}: ${f.type} at ${f.frequency?.toFixed(2) || 'N/A'}Hz, Gain: ${gain}${q ? ', ' + q : ''}`);
+              });
+
+            }
+            catch (error) {
+              console.debug(`${commandId[i]} could not re-match target after corrections`);
+            }
+
           }
           catch (error) {
             console.debug(`${commandId[i]} - Sanity check failed:`, error);
@@ -6721,13 +6893,6 @@
             // COLLECT DELAYS WITH HIERARCHICAL FILTERING
             // ═══════════════════════════════════════════════════════════════
             for (const [supportCmd, delayMs] of Object.entries(result.recommendedDelays)) {
-              /*
-              // Skip subwoofers - their alignment is handled separately
-              if (supportCmd.startsWith('SW')) {
-                console.log(`   ├─ ${supportCmd}: ${delayMs.toFixed(2)}ms - skipped (subwoofer)`);
-                //continue;
-              }
-              */
               // Allow subwoofers to contribute to modal cancellation
               // (their inter-sub alignment is handled separately in Phase 2)
               if (supportCmd.startsWith('SW')) {
@@ -7070,11 +7235,34 @@
               speakerIndices.push(i);
             }
           }
+
           console.warn(`⚠ [DEBUG] >> ├─ Found ${speakerIndices.length} averaged speaker measurements`);
+
           if (speakerIndices.length === 0) {
-            console.warn("⚠ No speaker measurements found - skipping band");
-            continue;
+            console.warn("⚠ No averaged measurements ending with 'o' found");
+            console.warn("⚠ Attempting fallback: using RAW speaker measurements instead");
+
+            // Fallback: use original speaker measurements (indices 1 to nSpeakers)
+            const measurements = await fetch_mREW();
+            for (let i = 1; i <= nSpeakers; i++) {
+              const title = measurements[i]?.title;
+              if (title && !title.startsWith('SW')) {  // Not a subwoofer
+                speakerIndices.push(i);
+                console.info(`   ├─ Adding measurement ${i}: "${title}"`);
+              }
+            }
+
+            if (speakerIndices.length === 0) {
+              console.error("🞮 CRITICAL: No speaker measurements found at all!");
+              console.error("🞮 Cannot perform frequency-dependent alignment for this band");
+              console.error("🞮 Skipping ${band.name}");
+              continue;
+            }
+
+            console.info(`✓ Fallback successful: using ${speakerIndices.length} raw speaker measurements`);
           }
+
+
           console.info(`├─ Using ${speakerIndices.length} speaker measurements`);
           const avgSpeaker = await postNext('Magn plus phase average', Array.from(speakerIndices));
           const avgSpeakerIdx = Object.keys(avgSpeaker.results)[0];
@@ -7114,6 +7302,17 @@
         console.log("\n🎯 FINAL ALIGNMENT:");
         console.log(`├─ Weighted average delay: ${weightedDelay.toFixed(2)}ms`);
         console.log(`├─ Subwoofer inversion: ${finalInversion ? 'YES' : 'NO'}`);
+
+        // [DEBUG][DEBUG]
+        console.log(`═════════════════════════════════════════════════════════════`);
+        console.log(`DEBUG SINGLE SUB CHECK:`);
+        console.log(`├─ hasDirectionalBass: ${window.hasDirectionalBass}`);
+        console.log(`├─ preCombinedSubCount: ${window.preCombinedSubCount}`);
+        console.log(`├─ nSubs: ${nSubs}`);
+        console.log(`└─ Will use: ${(window.hasDirectionalBass && window.preCombinedSubCount > 1) ? 'DIRECTIONAL PATH' : 'STANDARD/SINGLE SUB PATH'}`);
+        console.log(`═════════════════════════════════════════════════════════════`);
+        // [DEBUG][DEBUG]
+
         // ═══════════════════════════════════════════════════════════════════════════
         // CRITICAL: Handle directional vs standard bass differently
         // ═══════════════════════════════════════════════════════════════════════════
@@ -7145,27 +7344,28 @@
         return { alignmentResults, finalDelay: weightedDelay, finalInversion };
       }
 
-      // Strategy 1: Maximize output (vector sum magnitude)
+      // Strategy 1: Maximize output (vector sum magnitude) - TWO PASS VERSION
       async function alignForMaxOutput(speakerIdx, subIdx, startFreq, endFreq) {
-        console.info(`   Optimizing for maximum output...`);
+        console.info(`   Optimizing for maximum output (two-pass)...`);
         await postNext('Smooth', speakerIdx, { smoothing: "1/12" });
         await postNext('Smooth', subIdx, { smoothing: "1/12" });
-        // Use appropriate delay range based on whether we have directional subs
+
         let loDelay, hiDelay;
         if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
           [loDelay, hiDelay] = getDelayRangeOf(mSec[nSpeakers + 1], 1, nSpeakers);
         } else {
           [loDelay, hiDelay] = getDelayRangeOfFinalSub();
         }
+
         let maxOutput = -Infinity;
         let bestDelay = 0;
         let bestInvert = false;
-        // Test delays
-        // for (let testDelay = loDelay; testDelay <= hiDelay; testDelay += 0.5) {
-        for (let testDelay = loDelay; testDelay <= hiDelay; testDelay += 0.25) {
+
+        // PASS 1: Coarse search (2ms steps)
+        console.info(`   Pass 1: Coarse search (2ms steps)`);
+        for (let testDelay = loDelay; testDelay <= hiDelay; testDelay += 2) {
           for (const invert of [false, true]) {
             if (noInversion && invert) continue;
-            // Simulate alignment
             const output = await simulateAlignment(speakerIdx, subIdx, testDelay, invert, startFreq, endFreq);
             if (output > maxOutput) {
               maxOutput = output;
@@ -7174,6 +7374,24 @@
             }
           }
         }
+
+        // PASS 2: Fine search around best result (0.25ms steps, ±4ms range)
+        console.info(`   Pass 2: Fine search around ${bestDelay}ms (0.25ms steps)`);
+        const fineStart = Math.max(loDelay, bestDelay - 4);
+        const fineEnd = Math.min(hiDelay, bestDelay + 4);
+
+        for (let testDelay = fineStart; testDelay <= fineEnd; testDelay += 0.25) {
+          for (const invert of [false, true]) {
+            if (noInversion && invert) continue;
+            const output = await simulateAlignment(speakerIdx, subIdx, testDelay, invert, startFreq, endFreq);
+            if (output > maxOutput) {
+              maxOutput = output;
+              bestDelay = testDelay;
+              bestInvert = invert;
+            }
+          }
+        }
+
         return {
           requiredDelay: bestDelay,
           isInverted: bestInvert,
@@ -7182,28 +7400,28 @@
         };
       }
 
-      // Strategy 2: Phase coherence (minimize phase variation)
+      // Strategy 2: Phase coherence (minimize phase variation) - TWO PASS VERSION
       async function alignForPhaseCoherence(speakerIdx, subIdx, startFreq, endFreq) {
-        console.info(`   Optimizing for phase coherence...`);
+        console.info(`   Optimizing for phase coherence (two-pass)...`);
         await postNext('Smooth', speakerIdx, { smoothing: "1/12" });
         await postNext('Smooth', subIdx, { smoothing: "1/12" });
         await postSafe("http://localhost:4735/alignment-tool/index-a", speakerIdx, "selected as measurement A");
         await postSafe("http://localhost:4735/alignment-tool/index-b", subIdx, "selected as measurement B");
         await postAlign('Reset all');
-        // Use appropriate delay range based on whether we have directional subs
+
         let loDelay, hiDelay;
         if (window.hasDirectionalBass && window.preCombinedSubCount > 1) {
           [loDelay, hiDelay] = getDelayRangeOf(mSec[nSpeakers + 1], 1, nSpeakers);
         } else {
           [loDelay, hiDelay] = getDelayRangeOfFinalSub();
         }
+
         console.info(`   Raw delay range from getDelayRange: loDelay=${loDelay.toFixed(2)}ms, hiDelay=${hiDelay.toFixed(2)}ms`);
-        // Clamp to REW's valid ranges
+
         const maxNegativeDelay = Math.max(-1000, Math.min(0, loDelay));
         const maxPositiveDelay = Math.min(1000, Math.max(0, hiDelay));
         console.info(`   Clamped for REW alignment: ${maxNegativeDelay.toFixed(2)}ms to +${maxPositiveDelay.toFixed(2)}ms`);
 
-        // Warn if we had to clamp
         if (loDelay < -1000 || loDelay > 0) {
           console.warn(`   ⚠ loDelay (${loDelay.toFixed(2)}ms) was outside valid range [-1000, 0], clamped to ${maxNegativeDelay.toFixed(2)}ms`);
         }
@@ -7218,9 +7436,11 @@
         let bestPhaseCoherence = Infinity;
         let bestDelay = 0;
         let bestInvert = false;
+        let bestFreq = startFreq;
 
-        // Scan through band
-        for (let checkFreq = startFreq; checkFreq <= endFreq; checkFreq += 2.5) {
+        // PASS 1: Coarse frequency scan (10Hz steps)
+        console.info(`   Pass 1: Coarse scan (10Hz steps)`);
+        for (let checkFreq = startFreq; checkFreq <= endFreq; checkFreq += 10) {
           const postAlignResult = await postAlign('Align IRs', checkFreq);
           if (postAlignResult.message === 'Delay too large') continue;
 
@@ -7229,7 +7449,31 @@
 
           if (noInversion && invertB) continue;
 
-          // Measure phase coherence
+          const tempSum = await fetchAlign("aligned-frequency-response?smoothing=1/12&ppo=96");
+          const phaseCoherence = measurePhaseCoherence(tempSum, startFreq, endFreq);
+
+          if (phaseCoherence < bestPhaseCoherence) {
+            bestPhaseCoherence = phaseCoherence;
+            bestDelay = delayB;
+            bestInvert = invertB;
+            bestFreq = checkFreq;
+          }
+        }
+
+        // PASS 2: Fine frequency scan around best result (2.5Hz steps, ±15Hz range)
+        console.info(`   Pass 2: Fine scan around ${bestFreq}Hz (2.5Hz steps)`);
+        const fineStart = Math.max(startFreq, bestFreq - 15);
+        const fineEnd = Math.min(endFreq, bestFreq + 15);
+
+        for (let checkFreq = fineStart; checkFreq <= fineEnd; checkFreq += 2.5) {
+          const postAlignResult = await postAlign('Align IRs', checkFreq);
+          if (postAlignResult.message === 'Delay too large') continue;
+
+          const invertB = await fetchAlign('invert-b');
+          const delayB = parseFloat(await fetchAlign('delay-b'));
+
+          if (noInversion && invertB) continue;
+
           const tempSum = await fetchAlign("aligned-frequency-response?smoothing=1/12&ppo=96");
           const phaseCoherence = measurePhaseCoherence(tempSum, startFreq, endFreq);
 

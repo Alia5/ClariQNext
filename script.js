@@ -1,4 +1,4 @@
-// ClariQ Next 0.1.0 - 19-10-2025 @ 17:24
+// ClariQ Next 0.1.2 - 20-10-2025 @ 16:33
 // Cross-browser compatibility fixes
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -1879,12 +1879,6 @@ document.addEventListener("DOMContentLoaded", function () {
 							await clearCommands();
 							await disableGraph();
 							await enableBlock();
-							if (typeof SetTargetlevel === "function") SetTargetlevel();
-							console.log(`Targetlevel: ${typeof targetLevel !== "undefined" ? targetLevel : "undefined"}dB correction set successfully`);
-							console.log("DEBUG: About to call SetnoInversion...");
-							if (typeof SetnoInversion === "function") SetnoInversion();
-							console.log("DEBUG: After calling SetnoInversion...");
-							console.log(`noInversion: ${typeof noInversion !== "undefined" ? noInversion : "undefined"} set successfully`);
 						} catch (error) {
 							console.error("Error:", error);
 						}
