@@ -1,4 +1,4 @@
-// ClariQ Next 0.1.2 - 20-10-2025 @ 16:33
+// ClariQ Next 0.1.3 - 20-10-2025 @ 23:02
 // Cross-browser compatibility fixes
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
