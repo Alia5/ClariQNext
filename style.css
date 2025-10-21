@@ -1,4 +1,4 @@
-/* ClariQ Next 0.1.3 - 20-10-2025 @ 23:02*/
+/* ClariQ Next 0.1.4 - 21-10-2025 @ 13:49 */
 :root {
 	--primary-color: #2563eb;
 	--secondary-color: #3b82f6;
@@ -693,4 +693,9 @@ ul ul ul li {
 	margin-top: 1rem;
 	color: var(--text-muted);
 	font-style: italic;
+}
+
+/* 0.1.4 update */
+h2.nvexx {
+	text-decoration: none;
 }

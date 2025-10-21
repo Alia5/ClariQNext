@@ -17,7 +17,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     //ALL SETTINGS GO HERE
-    const nextversion = "ClariQ Next 0.1.3 - 20-10-2025 @ 23:02";
+    const nextversion = "ClariQ Next 0.1.4 - 21-10-2025 @ 13:49";
     // ClearCurve
     let isClearCurve = false;
     const modelsSoS300 = ["-S720W", "-S920W", "X1300W", "X2300W", "X3300W", "NR1607", "SR5011", "SR6011", "C-A110", "X3700H", "X4700H", "X6500H", "X6700H",
@@ -1120,12 +1120,28 @@
           </div>
         </div>
 
-        <h2><img src="https://www.nvexx.nl/audyssey/nvexx_128.png" class="centerimg" alt="Nvexx logo" />ClariQ Next</h2>
+        <h2 class="nvexx"><img src="https://www.nvexx.nl/audyssey/nvexx_128.png" class="centerimg"
+            alt="Nvexx logo" />ClariQ Next</h2>
         <noscript>
           <div style="color: red; padding: 10px; border: 1px solid red;">
             JavaScript is disabled in your browser. Please enable it for full functionality.
           </div>
         </noscript>
+        <script>
+
+
+          const h2 = document.querySelector("h2.nvexx");
+
+          // Extract only up to the version number (x.y.z)
+          const trimmed = nextversion.match(/^(.*?\d+\.\d+\.\d+)/)?.[1] || nextversion;
+
+          // Find the text node after the <img> and replace its text
+          h2.childNodes.forEach((node) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+              node.textContent = " " + trimmed;
+            }
+          });
+        </script>
       </div>
 
       <div class="progress">
@@ -2967,9 +2983,9 @@
             // Try the distance property as a fallback
             dist = parseFloat(channels[flIndex].distance);
             if (isNaN(dist) || dist === 0 || dist === null) {
-              console.warn(`⚠ No distance found for ${channels[flIndex].commandId}! Defaulting to 6m.`)
+              console.warn(`⚠ No distance found for ${channels[flIndex].commandId}! Defaulting to 2.75m.`)
               console.warn(`⚠ To fix: Open ady in MultEQ phone app then > Speaker Detection Results > Change any crossover > Save and then retry.`);
-              dist = 6.00;
+              dist = 2.75;
             }
           }
         }
@@ -3492,26 +3508,30 @@
           targetCurvePath = String(target);
           if (target && targetCurvePath) {
             targetCurveName = targetCurvePath.replace(/^.*[\\/]/, '').split(".")[0];
-            Object.freeze(targetCurveName);
             Object.freeze(targetCurvePath);
+            Object.freeze(targetCurveName);
             await disableRoomCurve();
-            await customDelay(speedDelay);
+            // await customDelay(speedDelay);
             await postSafe(`http://localhost:4735/eq/house-curve`, targetCurvePath, "House curve set");
-            await customDelay(speedDelay);
+            // await customDelay(speedDelay);
           }
           else {
             targetCurveName = "";
             await enableRoomCurve();
-            await customDelay(speedDelay);
+            // await customDelay(speedDelay);
           }
 
-          await fetchSafe('target-level', 1, targetLevel, "Target level set")
-          const targetCurve = await postNext('Generate target measurement', 1);
-          await customDelay(speedDelay);
+          // await fetchSafe('target-level', 1, targetLevel, "Target level set")
+          await fetchSafe("target-level", 1, Number(targetLevel).toFixed(1), "Target level set");
+          // const targetCurve = await postNext('Generate target measurement', 1);
+          const targetCurve = await postNext("Generate target measurement", 1);
+          await customDelay(1000);
+          // await new Promise((resolve) => setTimeout(resolve, 500));
+
           const targetCurveIdx = Object.keys(targetCurve.results)[0];
           // targetResponse = await fetchSafe(`frequency-response?smoothing=1%2F48&ppo=96`, targetCurveIdx);
           targetResponse = await fetchSafe("frequency-response?smoothing=1/48&ppo=96", targetCurveIdx);
-          await customDelay(speedDelay);
+          //  await customDelay(1000);
 
           if (isDebugMode) {
             console.log("=== TARGET CURVE SPL DEBUG ===");
@@ -3554,44 +3574,16 @@
       function getDelayHeadroom(startIdx, endIdx) {
         const minM = Math.min(...mSec.slice(startIdx, endIdx + 1));
         const maxM = Math.max(...mSec.slice(startIdx, endIdx + 1));
-        const currentSpan = maxM - minM;
-
-        // Maximum allowed distance SPAN (not absolute distance)
-        const maxDistSpan = DiracEnabled === true ? 18 : 6;
-        const maxSpanInSec = maxDistSpan / sOs;
-
-        // Calculate how much we can shift without exceeding span limit
-        // Current span in seconds
-        const currentSpanSec = currentSpan;
-
-        // Available headroom for expanding the span
-        const availableSpanIncrease = maxSpanInSec - currentSpanSec;
-
-        if (availableSpanIncrease < 0) {
-          console.error(`🞮 Current delay span ${(currentSpanSec * sOs).toFixed(2)}m already exceeds ${maxDistSpan}m limit!`);
-          throw new Error("Delay span exceeds AVR limits");
-        }
-
-        // We can push delays in either direction, but total span must stay ≤ maxSpanInSec
-        // Conservative approach: allow equal expansion in both directions
-        const maxExpansion = availableSpanIncrease / 2;
-
-        // Maximum delays we can apply
-        const msecMin = maxM - maxExpansion;  // How far we can push the max delay DOWN
-        const msecMax = minM + maxExpansion;  // How far we can push the min delay UP
-
+        const maxDist = DiracEnabled === true ? 18 : 6;
+        const limInsec = maxDist / sOs;
+        const msecMin = maxM - limInsec;
+        const msecMax = minM + limInsec;
         const maxNegative = msecMin * delaymax;
         const maxPositive = msecMax * delaymax;
-
         if (maxNegative > maxPositive) {
           console.error("🞮 Ran out of delay range!");
           throw new Error;
         }
-
-        // Log constraints for debugging
-        console.info(`   Delay headroom: current span ${(currentSpanSec * sOs).toFixed(2)}m, ` +
-          `limit ${maxDistSpan}m, available expansion ${(availableSpanIncrease * sOs).toFixed(2)}m`);
-
         return [maxNegative, maxPositive];
       }
 
@@ -5382,26 +5374,77 @@
       }
 
       function initializeDistances() {
-        // Determine max distance based on Dirac support
-        const maxDistance = DiracEnabled ? 18 : 6;
+        const maxDistSpan = DiracEnabled ? 18 : 6;
 
         // initialize to 0
         for (let i = 1; i <= nSpeakers + nSubs; i++) {
           customDistance[i] = 0;
         }
         if (noSub) { return; }
+
         const flIndex = getFLIndex();
+
+        // Calculate projected distances INCLUDING NART effects
+        const nartDelayFL = nartDelays[commandId[flIndex]] || 0;
+        const acousticMSecFL = mSec[flIndex] - nartDelayFL;
+
+        let projectedMin = Infinity;
+        let projectedMax = -Infinity;
+
+        // Calculate speaker projections
+        for (let i = 1; i <= nSpeakers; i++) {
+          const nartDelay = nartDelays[commandId[i]] || 0;
+          const acousticMSec = mSec[i] - nartDelay;
+          const dist = flDist + (acousticMSecFL - acousticMSec) * sOs;
+          projectedMin = Math.min(projectedMin, dist);
+          projectedMax = Math.max(projectedMax, dist);
+        }
+
+        // Calculate sub projections
+        for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
+          const acousticMSec = mSec[i];
+          const dist = flDist + (acousticMSecFL - acousticMSec) * sOs;
+          projectedMin = Math.min(projectedMin, dist);
+          projectedMax = Math.max(projectedMax, dist);
+        }
+
+        const projectedSpan = projectedMax - projectedMin;
+
+        console.info(`📏 Projected distance span: ${projectedSpan.toFixed(2)}m (limit: ${maxDistSpan}m)`);
+
+        // If span exceeds limit, compress the TIME delays to fit
+        if (projectedSpan > maxDistSpan) {
+          const compressionFactor = maxDistSpan / projectedSpan;
+          console.warn(`⚠ Span ${projectedSpan.toFixed(2)}m exceeds ${maxDistSpan}m limit`);
+          console.warn(`   Compressing time delays by ${(compressionFactor * 100).toFixed(1)}% to fit`);
+
+          // Calculate centroid of current delays (reference point)
+          let sumMSec = 0;
+          for (let i = 1; i <= nSpeakers + nSubs; i++) {
+            sumMSec += mSec[i];
+          }
+          const centroid = sumMSec / (nSpeakers + nSubs);
+
+          // Compress all delays relative to centroid
+          for (let i = 1; i <= nSpeakers + nSubs; i++) {
+            const offset = mSec[i] - centroid;
+            mSec[i] = centroid + (offset * compressionFactor);
+          }
+
+          console.info(`   Time delays compressed to fit within ${maxDistSpan}m span`);
+          console.info(`   Relative timing relationships preserved at ${(compressionFactor * 100).toFixed(1)}%`);
+        }
+
+        // Now handle negative distances and shifting (original logic)
         let distMinSub = Infinity;
         let distMaxSub = -Infinity;
 
-        // check if any directional subwoofer needs negative distance
         if (bassMode === "Directional") {
           for (let i = nSpeakers + 1; i <= nSpeakers + nSubs; i++) {
             const distSub = flDist + (mSec[flIndex] - mSec[i]) * sOs;
             distMinSub = Math.min(distMinSub, distSub);
             distMaxSub = Math.max(distMaxSub, distSub);
           }
-          // check if any SWMIX subwoofer needs negative distance  
         } else {
           const distMainSub = flDist + (mSec[flIndex] - mSec[nChannels]) * sOs;
           const distLoSub = distMainSub - subLoDelay * sOs;
@@ -5410,28 +5453,19 @@
           distMaxSub = Math.max(distLoSub, distHiSub);
         }
 
-        // FIXED: Use maxDistance variable instead of hardcoded 18
-        if (distMinSub < 0 && distMaxSub > maxDistance) {
-          console.error(`🞮 Min/Max subwoofer distances exceed the 0 - ${maxDistance}m AVR limits!`);
-          throw new Error;
-        }
-
         if (distMinSub < 0) {
           const distShift = 0 - distMinSub;
-          console.warn(`⚠ Distances are being shifted by ${distShift.toFixed(2)}m to accommodate the required subwoofer delay!`);
-          console.info("This adjustment will ONLY improve overall sound quality.");
-          console.info("The receiver only accounts for relative time delays between speakers which are being kept intact.");
+          console.warn(`⚠ Distances being shifted by +${distShift.toFixed(2)}m to eliminate negatives`);
+          console.info("This adjustment maintains relative timing - sound quality preserved.");
           for (let i = 1; i <= nSpeakers + nSubs; i++) {
             customDistance[i] += distShift;
           }
         }
 
-        // FIXED: Use maxDistance variable instead of hardcoded 18
-        if (distMaxSub > maxDistance) {
-          const distShift = maxDistance - distMaxSub;
-          console.warn(`⚠ Distances are being shifted by ${distShift.toFixed(2)}m to accommodate the required subwoofer delay!`);
-          console.info("This adjustment will ONLY improve overall sound quality.");
-          console.info("The receiver only accounts for relative time delays between speakers which are being kept intact.");
+        if (distMaxSub > maxDistSpan) {
+          const distShift = maxDistSpan - distMaxSub;
+          console.warn(`⚠ Distances being shifted by ${distShift.toFixed(2)}m to fit within ${maxDistSpan}m`);
+          console.info("This adjustment maintains relative timing - sound quality preserved.");
           for (let i = 1; i <= nSpeakers + nSubs; i++) {
             customDistance[i] += distShift;
           }

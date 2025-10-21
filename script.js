@@ -1,4 +1,4 @@
-// ClariQ Next 0.1.3 - 20-10-2025 @ 23:02
+// ClariQ Next 0.1.4 - 21-10-2025 @ 13:49
 // Cross-browser compatibility fixes
 // Browser detection (lightweight)
 function checkBrowserCompatibility() {
@@ -401,18 +401,30 @@ document.addEventListener("DOMContentLoaded", function () {
 			return [];
 		}
 
+		// isDolbymode mode - different filtering for bed vs height
+		if (typeof isDolbymode !== "undefined" && isDolbymode) {
+			if (layer === "bed") {
+				const frequenciesToRemove = [200, 250];
+				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
+				console.log(`🎛️ Dolby mode (BED): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
+				return filteredFreqs;
+			} else if (layer === "height") {
+				const frequenciesToRemove = [200, 250]; // Could be different for heights
+				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
+				console.log(`🎛️ Dolby mode (HEIGHT): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
+				return filteredFreqs;
+			}
+		}
+
 		// RP22 mode - different filtering for bed vs height
 		if (typeof isRP22mode !== "undefined" && isRP22mode) {
 			if (layer === "bed") {
-				// const frequenciesToRemove = [40, 60, 200, 250];
-				const frequenciesToRemove = [];
+				const frequenciesToRemove = [200, 250];
 				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
 				console.log(`🎛️ Cedia RP22 mode (BED): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
 				return filteredFreqs;
 			} else if (layer === "height") {
-				// For height channels in RP22 mode, maybe different filtering or same
-				// const frequenciesToRemove = [40, 60, 200, 250]; // Could be different for heights
-				const frequenciesToRemove = []; // Could be different for heights
+				const frequenciesToRemove = [200, 250]; // Could be different for heights
 				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
 				console.log(`🎛️ Cedia RP22 mode (HEIGHT): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
 				return filteredFreqs;
@@ -425,13 +437,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				console.log(`🎛️ THX mode (BED): Keeping only frequency 80`);
 				return [80];
 			} else if (layer === "height") {
-				// Heights might use different frequency in THX mode
-				/*
-				console.log(`🎛️ THX mode (HEIGHT): Keeping only frequency 80`);
-				return [80, 90, 100, 110, 120, 150, 200]; // Or could be different like [100] for heights
-				*/
-				// For height channels in RP22 mode, maybe different filtering or same
-				const frequenciesToRemove = [20, 40, 60, 70, 200, 250]; // Could be different for heights
+				const frequenciesToRemove = [20, 40, 60, 70, 200, 250];
 				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
 				console.log(`🎛️ THX mode (HEIGHT): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
 				return filteredFreqs;
@@ -444,12 +450,7 @@ document.addEventListener("DOMContentLoaded", function () {
 				console.log(`🎛️ IMAX mode (BED): Keeping only frequency 70`);
 				return [70];
 			} else if (layer === "height") {
-				// Heights might use different frequency in IMAX mode
-				/*
-				console.log(`🎛️ IMAX mode (HEIGHT): Keeping only frequency 70`);
-				return [70, 80, 90, 100, 110, 120, 150, 200]; // Or could be different like [80] for heights
-				*/
-				const frequenciesToRemove = [20, 40, 60, 200, 250]; // Could be different for heights
+				const frequenciesToRemove = [20, 40, 60, 200, 250];
 				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
 				console.log(`🎛️ IMAX mode (HEIGHT): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
 				return filteredFreqs;
@@ -472,23 +473,25 @@ document.addEventListener("DOMContentLoaded", function () {
 			}
 		}
 
-		// Default behavior - different base frequencies for bed vs height
+		// Default behavior  Home Cinema (75dB) default mode - different base frequencies for bed vs height
 		if (layer === "bed") {
 			if (typeof isClearCurve !== "undefined" && isClearCurve === false) {
-				console.log(`🎛️ Standard mode (BED): Using full freqIndex`);
-				return freqIndex;
+				// const frequenciesToRemove = [40, 60, 200, 250];
+				const frequenciesToRemove = [200, 250];
+				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
+				console.log(`🎛️ Home Cinema (75dB) default mode (BED): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
+				return filteredFreqs;
 			} else {
 				console.log(`🎛️ Standard mode (BED): Using mergefreqIndex`);
 				return typeof mergefreqIndex !== "undefined" ? mergefreqIndex : freqIndex;
 			}
 		} else if (layer === "height") {
 			if (typeof isClearCurve !== "undefined" && isClearCurve === false) {
-				// For height channels, might want to filter out very low frequencies
-				// const heightFreqs = freqIndex.filter((freq) => freq >= 60); // Heights typically don't go as low
-				// console.log(`🎛️ Standard mode (HEIGHT): Using filtered freqIndex (≥60Hz)`);
-				console.log(`🎛️ Standard mode (HEIGHT): : Using full freqIndex`);
-				// return heightFreqs;
-				return freqIndex;
+				// const frequenciesToRemove = [40, 60, 200, 250];
+				const frequenciesToRemove = [200, 250];
+				const filteredFreqs = freqIndex.filter((freq) => !frequenciesToRemove.includes(freq));
+				console.log(`🎛️ Home Cinema (75dB) default mode (BED): Filtered ${freqIndex.length - filteredFreqs.length} frequencies`);
+				return filteredFreqs;
 			} else {
 				console.log(`🎛️ Standard mode (HEIGHT): Using mergefreqIndex`);
 				return typeof mergefreqIndex !== "undefined" ? mergefreqIndex : freqIndex;
@@ -498,6 +501,87 @@ document.addEventListener("DOMContentLoaded", function () {
 		// Fallback to original behavior
 		console.warn(`⚠️ Unknown layer '${layer}', using default frequencies`);
 		return typeof isClearCurve !== "undefined" && isClearCurve ? (typeof mergefreqIndex !== "undefined" ? mergefreqIndex : freqIndex) : freqIndex;
+	}
+
+	// Get default frequency selections based on mode and layer
+	function getDefaultFrequencySelection(frequencies, layer = "bed") {
+		if (!frequencies || frequencies.length === 0) {
+			return { minIndex: 0, maxIndex: 0, currentIndex: 0 };
+		}
+
+		// Helper to find index of closest frequency
+		const findFreqIndex = (targetFreq) => {
+			const index = frequencies.findIndex((f) => f === targetFreq);
+			return index !== -1 ? index : Math.floor(frequencies.length / 2);
+		};
+
+		// RP22 Mode defaults
+		if (typeof isRP22mode !== "undefined" && isRP22mode) {
+			if (layer === "bed") {
+				return { minIndex: findFreqIndex(80), maxIndex: findFreqIndex(100) };
+			} else if (layer === "height") {
+				return { minIndex: findFreqIndex(110), maxIndex: findFreqIndex(150) };
+			}
+		}
+
+		// Dolby Mode defaults
+		if (typeof isDolbymode !== "undefined" && isDolbymode) {
+			if (layer === "bed") {
+				return { minIndex: findFreqIndex(80), maxIndex: findFreqIndex(100) };
+			} else if (layer === "height") {
+				return { minIndex: findFreqIndex(110), maxIndex: findFreqIndex(150) };
+			}
+		}
+
+		// THX Mode defaults
+		if (typeof isTHXmode !== "undefined" && isTHXmode) {
+			if (layer === "bed") {
+				return { minIndex: findFreqIndex(80), maxIndex: findFreqIndex(80) };
+			} else if (layer === "height") {
+				return { minIndex: findFreqIndex(100), maxIndex: findFreqIndex(120) };
+			}
+		}
+
+		// IMAX Mode defaults
+		if (typeof isIMAXmode !== "undefined" && isIMAXmode) {
+			if (layer === "bed") {
+				return { minIndex: findFreqIndex(70), maxIndex: findFreqIndex(70) };
+			} else if (layer === "height") {
+				return { minIndex: findFreqIndex(70), maxIndex: findFreqIndex(110) };
+			}
+		}
+
+		// ClearCurve Mode defaults
+		if (typeof isClearCurve !== "undefined" && isClearCurve) {
+			if (layer === "bed") {
+				return {
+					minIndex: findFreqIndex(260),
+					maxIndex: findFreqIndex(260),
+					currentIndex: Math.floor(frequencies.length / 2),
+				};
+			} else if (layer === "height") {
+				return {
+					minIndex: findFreqIndex(260),
+					maxIndex: findFreqIndex(260),
+					currentIndex: Math.floor(frequencies.length / 2),
+				};
+			}
+		}
+
+		// Default/Standard Mode (Home Cinema 75dB, etc.)
+		// Default/Standard Mode (Home Cinema 75dB, etc.)
+		if (layer === "bed") {
+			return { minIndex: findFreqIndex(80), maxIndex: findFreqIndex(100) };
+		} else if (layer === "height") {
+			return { minIndex: findFreqIndex(110), maxIndex: findFreqIndex(150) };
+		}
+
+		// Fallback
+		return {
+			minIndex: 0,
+			maxIndex: Math.max(0, frequencies.length - 1),
+			currentIndex: Math.floor(frequencies.length / 2),
+		};
 	}
 
 	// ============================================================================
@@ -729,7 +813,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (centerContainer && !sliderInstances.center && bedFilteredFreqs.length > 0 && hasCenter) {
 				console.log(`Initializing CENTER channel slider...`);
 				try {
-					sliderInstances.center = new RangeSlider(centerContainer, bedFilteredFreqs, useSingleMode, "center");
+					const centerDefaults = getDefaultFrequencySelection(bedFilteredFreqs, "bed");
+					sliderInstances.center = new RangeSlider(centerContainer, bedFilteredFreqs, useSingleMode, "center", centerDefaults);
 					window.AppCalibration.sliderInstances.center = sliderInstances.center;
 					console.log("✅ CENTER channel slider initialized");
 				} catch (error) {
@@ -742,7 +827,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (centerheightChContainer && !sliderInstances.height_ch && heightFilteredFreqs.length > 0 && hasCenterHeight) {
 				console.log(`Initializing CENTER HEIGHT (AURO3D) channel slider...`);
 				try {
-					sliderInstances.height_ch = new RangeSlider(centerheightChContainer, heightFilteredFreqs, useSingleMode, "height_ch");
+					const centerheightDefaults = getDefaultFrequencySelection(bedFilteredFreqs, "bed");
+					sliderInstances.height_ch = new RangeSlider(centerheightChContainer, heightFilteredFreqs, useSingleMode, "height_ch", centerheightDefaults);
 					window.AppCalibration.sliderInstances.height_ch = sliderInstances.height_ch;
 					console.log("✅ CENTER HEIGHT (AURO3D) channel slider initialized");
 				} catch (error) {
@@ -755,7 +841,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (mainFlFrContainer && !sliderInstances.main_fl_fr && bedFilteredFreqs.length > 0 && hasFLFR) {
 				console.log(`Initializing FRONT LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.main_fl_fr = new RangeSlider(mainFlFrContainer, bedFilteredFreqs, useSingleMode, "main_fl_fr");
+					const mainFlFrDefaults = getDefaultFrequencySelection(bedFilteredFreqs, "bed");
+					sliderInstances.main_fl_fr = new RangeSlider(mainFlFrContainer, bedFilteredFreqs, useSingleMode, "main_fl_fr", mainFlFrDefaults);
 					window.AppCalibration.sliderInstances.main_fl_fr = sliderInstances.main_fl_fr;
 					console.log("✅ FRONT LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -768,7 +855,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (mainFwlFwrContainer && !sliderInstances.main_fwl_fwr && bedFilteredFreqs.length > 0 && hasFWLFWR) {
 				console.log(`Initializing FRONT WIDE LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.main_fwl_fwr = new RangeSlider(mainFwlFwrContainer, bedFilteredFreqs, useSingleMode, "main_fwl_fwr");
+					const mainFwlFwrDefaults = getDefaultFrequencySelection(bedFilteredFreqs, "bed");
+					sliderInstances.main_fwl_fwr = new RangeSlider(mainFwlFwrContainer, bedFilteredFreqs, useSingleMode, "main_fwl_fwr", mainFwlFwrDefaults);
 					window.AppCalibration.sliderInstances.main_fwl_fwr = sliderInstances.main_fwl_fwr;
 					console.log("✅ FRONT WIDE LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -781,7 +869,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (surroundSlaSraContainer && !sliderInstances.surround_sla_sra && bedFilteredFreqs.length > 0 && hasSLASRA) {
 				console.log(`Initializing SURROUND LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.surround_sla_sra = new RangeSlider(surroundSlaSraContainer, bedFilteredFreqs, useSingleMode, "surround_sla_sra");
+					const surroundSlaSraDefaults = getDefaultFrequencySelection(bedFilteredFreqs, "bed");
+					sliderInstances.surround_sla_sra = new RangeSlider(surroundSlaSraContainer, bedFilteredFreqs, useSingleMode, "surround_sla_sra", surroundSlaSraDefaults);
 					window.AppCalibration.sliderInstances.surround_sla_sra = sliderInstances.surround_sla_sra;
 					console.log("✅ SURROUND LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -794,7 +883,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (surroundSblSbrContainer && !sliderInstances.surround_sbl_sbr && bedFilteredFreqs.length > 0 && hasSBLSBR) {
 				console.log(`Initializing SURROUND BACK LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.surround_sbl_sbr = new RangeSlider(surroundSblSbrContainer, bedFilteredFreqs, useSingleMode, "surround_sbl_sbr");
+					const surroundSblSbrDefaults = getDefaultFrequencySelection(bedFilteredFreqs, "bed");
+					sliderInstances.surround_sbl_sbr = new RangeSlider(surroundSblSbrContainer, bedFilteredFreqs, useSingleMode, "surround_sbl_sbr", surroundSblSbrDefaults);
 					window.AppCalibration.sliderInstances.surround_sbl_sbr = sliderInstances.surround_sbl_sbr;
 					console.log("✅ SURROUND BACK LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -807,7 +897,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (surroundSbContainer && !sliderInstances.surround_sb && bedFilteredFreqs.length > 0 && hasSB) {
 				console.log(`Initializing SURROUND BACK single channel slider...`);
 				try {
-					sliderInstances.surround_sb = new RangeSlider(surroundSbContainer, bedFilteredFreqs, useSingleMode, "surround_sb");
+					const surroundSbDefaults = getDefaultFrequencySelection(bedFilteredFreqs, "bed");
+					sliderInstances.surround_sb = new RangeSlider(surroundSbContainer, bedFilteredFreqs, useSingleMode, "surround_sb", surroundSbDefaults);
 					window.AppCalibration.sliderInstances.surround_sb = sliderInstances.surround_sb;
 					console.log("✅ SURROUND BACK single channel slider initialized");
 				} catch (error) {
@@ -820,7 +911,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (heightFhlFhrContainer && !sliderInstances.height_fhl_fhr && heightFilteredFreqs.length > 0 && hasFHLFHR) {
 				console.log(`Initializing FRONT HEIGHT LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.height_fhl_fhr = new RangeSlider(heightFhlFhrContainer, heightFilteredFreqs, useSingleMode, "height_fhl_fhr");
+					const sheightFhlFhrDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.height_fhl_fhr = new RangeSlider(heightFhlFhrContainer, heightFilteredFreqs, useSingleMode, "height_fhl_fhr", sheightFhlFhrDefaults);
 					window.AppCalibration.sliderInstances.height_fhl_fhr = sliderInstances.height_fhl_fhr;
 					console.log("✅ FRONT HEIGHT LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -833,7 +925,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (heightShlShrContainer && !sliderInstances.height_shl_shr && heightFilteredFreqs.length > 0 && hasSHLSHR) {
 				console.log(`Initializing SURROUND HEIGHT LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.height_shl_shr = new RangeSlider(heightShlShrContainer, heightFilteredFreqs, useSingleMode, "height_shl_shr");
+					const heightShlShrDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.height_shl_shr = new RangeSlider(heightShlShrContainer, heightFilteredFreqs, useSingleMode, "height_shl_shr", heightShlShrDefaults);
 					window.AppCalibration.sliderInstances.height_shl_shr = sliderInstances.height_shl_shr;
 					console.log("✅ SURROUND HEIGHT LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -846,7 +939,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (heightRhlRhrContainer && !sliderInstances.height_rhl_rhr && heightFilteredFreqs.length > 0 && hasRHLRHR) {
 				console.log(`Initializing REAR HEIGHT LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.height_rhl_rhr = new RangeSlider(heightRhlRhrContainer, heightFilteredFreqs, useSingleMode, "height_rhl_rhr");
+					const heightRhlRhrDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.height_rhl_rhr = new RangeSlider(heightRhlRhrContainer, heightFilteredFreqs, useSingleMode, "height_rhl_rhr", heightRhlRhrDefaults);
 					window.AppCalibration.sliderInstances.height_rhl_rhr = sliderInstances.height_rhl_rhr;
 					console.log("✅ REAR HEIGHT LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -859,7 +953,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (topTflTfrContainer && !sliderInstances.top_tfl_tfr && heightFilteredFreqs.length > 0 && hasTFLTFR) {
 				console.log(`Initializing TOP FRONT LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.top_tfl_tfr = new RangeSlider(topTflTfrContainer, heightFilteredFreqs, useSingleMode, "top_tfl_tfr");
+					const topTflTfrDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.top_tfl_tfr = new RangeSlider(topTflTfrContainer, heightFilteredFreqs, useSingleMode, "top_tfl_tfr", topTflTfrDefaults);
 					window.AppCalibration.sliderInstances.top_tfl_tfr = sliderInstances.top_tfl_tfr;
 					console.log("✅ TOP FRONT LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -872,7 +967,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (topTmlTmrContainer && !sliderInstances.top_tml_tmr && heightFilteredFreqs.length > 0 && hasTMLTMR) {
 				console.log(`Initializing TOP MIDDLE LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.top_tml_tmr = new RangeSlider(topTmlTmrContainer, heightFilteredFreqs, useSingleMode, "top_tml_tmr");
+					const topTmlTmrDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.top_tml_tmr = new RangeSlider(topTmlTmrContainer, heightFilteredFreqs, useSingleMode, "top_tml_tmr", topTmlTmrDefaults);
 					window.AppCalibration.sliderInstances.top_tml_tmr = sliderInstances.top_tml_tmr;
 					console.log("✅ TOP MIDDLE LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -885,7 +981,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (topTrlTrrContainer && !sliderInstances.top_trl_trr && heightFilteredFreqs.length > 0 && hasTRLTRR) {
 				console.log(`Initializing TOP REAR LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.top_trl_trr = new RangeSlider(topTrlTrrContainer, heightFilteredFreqs, useSingleMode, "top_trl_trr");
+					const topTrlTrrDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.top_trl_trr = new RangeSlider(topTrlTrrContainer, heightFilteredFreqs, useSingleMode, "top_trl_trr", topTrlTrrDefaults);
 					window.AppCalibration.sliderInstances.top_trl_trr = sliderInstances.top_trl_trr;
 					console.log("✅ TOP REAR LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -898,7 +995,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (topTsContainer && !sliderInstances.top_ts && heightFilteredFreqs.length > 0 && hasTS) {
 				console.log(`Initializing TOP SURROUND (AURO3D) single channel slider...`);
 				try {
-					sliderInstances.top_ts = new RangeSlider(topTsContainer, heightFilteredFreqs, useSingleMode, "top_ts");
+					const topTsDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.top_ts = new RangeSlider(topTsContainer, heightFilteredFreqs, useSingleMode, "top_ts", topTsDefaults);
 					window.AppCalibration.sliderInstances.top_ts = sliderInstances.top_ts;
 					console.log("✅ TOP SURROUND (AURO3D) single channel slider initialized");
 				} catch (error) {
@@ -911,7 +1009,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (dolbyFdlFdrContainer && !sliderInstances.dolby_fdl_fdr && heightFilteredFreqs.length > 0 && hasFDLFDR) {
 				console.log(`Initializing FRONT DOLBY LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.dolby_fdl_fdr = new RangeSlider(dolbyFdlFdrContainer, heightFilteredFreqs, useSingleMode, "dolby_fdl_fdr");
+					const dolbyFdlFdrDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.dolby_fdl_fdr = new RangeSlider(dolbyFdlFdrContainer, heightFilteredFreqs, useSingleMode, "dolby_fdl_fdr", dolbyFdlFdrDefaults);
 					window.AppCalibration.sliderInstances.dolby_fdl_fdr = sliderInstances.dolby_fdl_fdr;
 					console.log("✅ FRONT DOLBY LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -924,7 +1023,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (dolbySdlSdrContainer && !sliderInstances.dolby_sdl_sdr && heightFilteredFreqs.length > 0 && hasSDLSDR) {
 				console.log(`Initializing SURROUND DOLBY LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.dolby_sdl_sdr = new RangeSlider(dolbySdlSdrContainer, heightFilteredFreqs, useSingleMode, "dolby_sdl_sdr");
+					const dolbySdlSdrDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.dolby_sdl_sdr = new RangeSlider(dolbySdlSdrContainer, heightFilteredFreqs, useSingleMode, "dolby_sdl_sdr", dolbySdlSdrDefaults);
 					window.AppCalibration.sliderInstances.dolby_sdl_sdr = sliderInstances.dolby_sdl_sdr;
 					console.log("✅ SURROUND DOLBY LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -937,7 +1037,8 @@ document.addEventListener("DOMContentLoaded", function () {
 			if (dolbyBdlBdrContainer && !sliderInstances.dolby_bdl_bdr && heightFilteredFreqs.length > 0 && hasBDLBDR) {
 				console.log(`Initializing BACK DOLBY LEFT&RIGHT paired channel slider...`);
 				try {
-					sliderInstances.dolby_bdl_bdr = new RangeSlider(dolbyBdlBdrContainer, heightFilteredFreqs, useSingleMode, "dolby_bdl_bdr");
+					const dolbyBdlBdrDefaults = getDefaultFrequencySelection(heightFilteredFreqs, "height");
+					sliderInstances.dolby_bdl_bdr = new RangeSlider(dolbyBdlBdrContainer, heightFilteredFreqs, useSingleMode, "dolby_bdl_bdr", dolbyBdlBdrDefaults);
 					window.AppCalibration.sliderInstances.dolby_bdl_bdr = sliderInstances.dolby_bdl_bdr;
 					console.log("✅ BACK DOLBY LEFT&RIGHT paired channel slider initialized");
 				} catch (error) {
@@ -997,7 +1098,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Enhanced function to handle slider value changes for all channels
 	function handleSliderChange(channelKey, currentRange) {
-		const rangeText = currentRange.min === currentRange.max ? `${currentRange.min}Hz` : `${currentRange.min}Hz to ${currentRange.max}Hz`;
+		let rangeText;
+		if (currentRange.mode === "single") {
+			rangeText = `${currentRange.value}Hz`;
+		} else {
+			rangeText = currentRange.min === currentRange.max ? `${currentRange.min}Hz` : `${currentRange.min}Hz to ${currentRange.max}Hz`;
+		}
 		console.log(`🎛️ ${channelKey.toUpperCase()} slider changed: ${rangeText}`);
 
 		if (currentRange.mode === "single") {
@@ -2323,14 +2429,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
 	// Updated RangeSlider class to support layer identification
 	class RangeSlider {
-		constructor(container, values, singleMode = false, layerType = "bed") {
+		constructor(container, values, singleMode = false, layerType = "bed", defaults = null) {
 			this.container = container;
 			this.values = values;
 			this.singleMode = singleMode;
-			this.layerType = layerType; // 'bed' or 'height'
-			this.minIndex = 0;
-			this.maxIndex = values.length - 1;
-			this.currentIndex = Math.floor(values.length / 2);
+			this.layerType = layerType;
+
+			// Apply defaults if provided, otherwise use standard defaults
+			if (defaults) {
+				this.minIndex = defaults.minIndex || 0;
+				this.maxIndex = defaults.maxIndex || values.length - 1;
+				this.currentIndex = defaults.currentIndex || Math.floor(values.length / 2);
+			} else {
+				this.minIndex = 0;
+				this.maxIndex = values.length - 1;
+				this.currentIndex = Math.floor(values.length / 2);
+			}
 
 			// Get elements with layer-specific IDs
 			this.sliderTrack = container.querySelector(".slider-track");
