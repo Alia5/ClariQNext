@@ -1,0 +1,87 @@
+name: Nightly Upstream Sync
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # runs daily at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Branch to sync (origin)'
+        required: false
+        default: 'main'
+      upstream_repo:
+        description: 'Upstream repository URL'
+        required: false
+        default: 'https://github.com/NvexxNL/ClariQNext'
+      upstream_branch:
+        description: 'Upstream branch to rebase onto'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly-upstream-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      TARGET_BRANCH: ${{ github.event.inputs.target_branch || 'main' }}
+      UPSTREAM_REPO: ${{ github.event.inputs.upstream_repo || 'https://github.com/NvexxNL/ClariQNext' }}
+      UPSTREAM_REF: ${{ github.event.inputs.upstream_branch || 'main' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.target_branch || 'main' }}
+
+      - name: Set up Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add/ensure upstream remote
+        run: |
+          # Add upstream or update URL if already present
+          if git remote get-url upstream >/dev/null 2>&1; then
+            git remote set-url upstream "$UPSTREAM_REPO"
+          else
+            git remote add upstream "$UPSTREAM_REPO"
+          fi
+          git remote -v
+
+      - name: Fetch upstream
+        run: |
+          git fetch upstream "$UPSTREAM_REF" --no-tags || git fetch upstream --no-tags
+
+      - name: Rebase onto upstream
+        id: rebase
+        run: |
+          set -euo pipefail
+          # Ensure local main is checked out
+          git checkout "$TARGET_BRANCH"
+          # Rebase local branch onto upstream/UPSTREAM_REF, fail on conflicts
+          if git rev-parse --verify "upstream/$UPSTREAM_REF" >/dev/null 2>&1; then
+            git rebase --rebase-merges "upstream/$UPSTREAM_REF"
+          else
+            echo "upstream/$UPSTREAM_REF not found after fetch" >&2
+            exit 1
+          fi
+
+      - name: Push rebased branch to origin
+        if: steps.rebase.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Use force-with-lease to safely update origin/main if it's fast-forwardable from our view
+          git push origin "$TARGET_BRANCH" --force-with-lease
+
+      - name: Fail with helpful message on rebase conflicts
+        if: steps.rebase.outcome != 'success'
+        run: |
+          echo "Rebase failed (most likely due to conflicts). Please resolve locally and push." >&2
+          exit 1
