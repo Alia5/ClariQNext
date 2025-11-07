@@ -2,7 +2,7 @@ name: Nightly Upstream Sync
 
 on:
   schedule:
-    - cron: '0 2 * * *' # runs daily at 02:00 UTC
+    #- cron: '0 2 * * *' # runs daily at 02:00 UTC
   workflow_dispatch:
     inputs:
       target_branch:
